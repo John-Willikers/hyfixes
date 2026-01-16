@@ -40,7 +40,7 @@ jobs:
           mkdir -p libs server-download
           ./hytale-downloader -download-path ./server-download/game.zip
           unzip -o ./server-download/game.zip -d ./server-download/
-          cp ./server-download/HytaleServer.jar libs/
+          cp ./server-download/Server/HytaleServer.jar libs/
 
       - name: Build with Gradle
         run: ./gradlew build
