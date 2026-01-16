@@ -42,8 +42,19 @@ jobs:
           unzip -o ./server-download/game.zip -d ./server-download/
           cp ./server-download/Server/HytaleServer.jar libs/
 
+      - name: Get version from tag or default
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="v1.0.0-dev"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build -Pversion=${{ steps.version.outputs.VERSION }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.hyfixes"
-version = "1.0.0"
+version = findProperty("version")?.toString()?.trimStart('v') ?: "1.0.0"
 
 java {
     toolchain {
