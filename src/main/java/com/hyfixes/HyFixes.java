@@ -2,13 +2,17 @@ package com.hyfixes;
 
 import com.hyfixes.commands.ChunkStatusCommand;
 import com.hyfixes.commands.ChunkUnloadCommand;
+import com.hyfixes.commands.InteractionStatusCommand;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
+import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
 import com.hyfixes.listeners.InstancePositionTracker;
+import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
+import com.hyfixes.systems.InteractionChainMonitor;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 
@@ -23,11 +27,14 @@ import java.util.logging.Level;
  *
  * Current fixes:
  * - PickupItemSanitizer: Prevents world thread crash from corrupted pickup items (null targetRef)
+ * - PickupItemChunkHandler: Backup protection during chunk unload events (v1.3.0)
  * - RespawnBlockSanitizer: Prevents crash when breaking respawn blocks with null respawnPoints
  * - ProcessingBenchSanitizer: Prevents crash when breaking processing benches with open windows
  * - EmptyArchetypeSanitizer: Monitors for entities with invalid state (empty archetypes)
  * - InstancePositionTracker: Prevents kick when exiting instances with missing return world
  * - ChunkUnloadManager: Aggressively unloads chunks to prevent memory bloat (v1.2.0)
+ * - GatherObjectiveTaskSanitizer: Prevents crash from null refs in quest objectives (v1.3.0)
+ * - InteractionChainMonitor: Tracks unfixable Hytale bugs for reporting (v1.3.0)
  */
 public class HyFixes extends JavaPlugin {
 
@@ -35,6 +42,9 @@ public class HyFixes extends JavaPlugin {
     private InstancePositionTracker instancePositionTracker;
     private ChunkUnloadManager chunkUnloadManager;
     private ChunkCleanupSystem chunkCleanupSystem;
+    private GatherObjectiveTaskSanitizer gatherObjectiveTaskSanitizer;
+    private PickupItemChunkHandler pickupItemChunkHandler;
+    private InteractionChainMonitor interactionChainMonitor;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -94,6 +104,24 @@ public class HyFixes extends JavaPlugin {
         chunkUnloadManager.start();
         getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
 
+        // Fix 7: GatherObjectiveTask null ref crash (v1.3.0)
+        // Validates refs in quest objectives before they can crash
+        gatherObjectiveTaskSanitizer = new GatherObjectiveTaskSanitizer(this);
+        getEntityStoreRegistry().registerSystem(gatherObjectiveTaskSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] GatherObjectiveTaskSanitizer registered - prevents crash from null refs in quest objectives");
+
+        // Fix 8: Pickup item chunk handler backup (v1.3.0)
+        // RefSystem backup for catching null targetRef during chunk unloads
+        pickupItemChunkHandler = new PickupItemChunkHandler(this);
+        getEntityStoreRegistry().registerSystem(pickupItemChunkHandler);
+        getLogger().at(Level.INFO).log("[FIX] PickupItemChunkHandler registered - backup protection during chunk unloads");
+
+        // Fix 9: InteractionChain monitoring (v1.3.0)
+        // Tracks unfixable Hytale bugs for reporting to developers
+        interactionChainMonitor = new InteractionChainMonitor(this);
+        getEntityStoreRegistry().registerSystem(interactionChainMonitor);
+        getLogger().at(Level.INFO).log("[MON] InteractionChainMonitor registered - tracks HyFixes statistics");
+
         // Register admin commands
         registerCommands();
     }
@@ -101,7 +129,8 @@ public class HyFixes extends JavaPlugin {
     private void registerCommands() {
         getCommandRegistry().registerCommand(new ChunkStatusCommand(this));
         getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
-        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus and /chunkunload commands");
+        getCommandRegistry().registerCommand(new InteractionStatusCommand(this));
+        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus, /chunkunload, and /interactionstatus commands");
     }
 
     @Override
@@ -119,7 +148,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 7; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem
+        return 10; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor
     }
 
     public static HyFixes getInstance() {
@@ -138,5 +167,26 @@ public class HyFixes extends JavaPlugin {
      */
     public ChunkCleanupSystem getChunkCleanupSystem() {
         return chunkCleanupSystem;
+    }
+
+    /**
+     * Get the GatherObjectiveTaskSanitizer for commands and status.
+     */
+    public GatherObjectiveTaskSanitizer getGatherObjectiveTaskSanitizer() {
+        return gatherObjectiveTaskSanitizer;
+    }
+
+    /**
+     * Get the PickupItemChunkHandler for commands and status.
+     */
+    public PickupItemChunkHandler getPickupItemChunkHandler() {
+        return pickupItemChunkHandler;
+    }
+
+    /**
+     * Get the InteractionChainMonitor for commands and status.
+     */
+    public InteractionChainMonitor getInteractionChainMonitor() {
+        return interactionChainMonitor;
     }
 }

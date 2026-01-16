@@ -197,17 +197,83 @@ Hytale does not properly unload chunks when players move away from them. Chunks 
 
 ---
 
+### 7. GatherObjectiveTask Null Ref Crash (v1.3.0)
+
+**Severity:** Critical - Crashes quest/objective processing
+
+**The Bug:**
+
+Hytale's `GatherObjectiveTask.lambda$setup0$1()` at line 65 calls:
+```java
+store.getComponent(ref, ...)
+```
+where `ref` can be null if the target entity was destroyed.
+
+```
+java.lang.NullPointerException: Cannot invoke "com.hypixel.hytale.component.Ref.validate()"
+because "ref" is null
+    at com.hypixel.hytale.component.Store.__internal_getComponent(Store.java:1222)
+    at GatherObjectiveTask.lambda$setup0$1(GatherObjectiveTask.java:65)
+```
+
+**Impact:** Quest/objective tasks fail when their target entity is destroyed.
+
+**The Fix:**
+
+`GatherObjectiveTaskSanitizer` monitors player objectives each tick using reflection to discover and validate objective component refs. If a ref is null or invalid, it attempts to clear/cancel the objective before the crash occurs.
+
+---
+
+### 8. Pickup Item Chunk Unload Protection (v1.3.0)
+
+**Severity:** Critical - Backup protection for edge cases
+
+**The Bug:**
+
+In rare cases, a player teleporting away can cause pickup items to crash if the `PickupItemSanitizer` tick doesn't run before the chunk unload cascade.
+
+**The Fix:**
+
+`PickupItemChunkHandler` is a `RefSystem` that acts as a backup to the primary `PickupItemSanitizer`. It intercepts entity removal events (including chunk unloads) and validates targetRef before the removal cascade can trigger a crash.
+
+---
+
+### 9. Interaction Chain Monitoring (v1.3.0)
+
+**Severity:** Monitoring - Cannot fix, only track
+
+**The Bug:**
+
+Hytale's InteractionChain system has a buffer overflow issue that causes 400+ errors per session:
+```
+[SEVERE] [InteractionChain] Attempted to store sync data at 1. Offset: 3, Size: 0
+```
+
+This affects combat damage, food SFX, and shield blocking. **This cannot be fixed at the plugin level** as it's deep in Hytale's core networking code.
+
+**The Fix:**
+
+`InteractionChainMonitor` tracks HyFixes statistics and known unfixable issues for reporting to Hytale developers.
+
+**Admin Commands:**
+- `/interactionstatus` (alias: `/hyfixes`, `/hfs`) - Shows comprehensive HyFixes statistics and known issues
+
+---
+
 ## Technical Details
 
 | Fix | System Type | Registry | Hook Point |
 |-----|-------------|----------|------------|
 | PickupItemSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `PickupItemComponent` |
+| PickupItemChunkHandler | `RefSystem<EntityStore>` | EntityStoreRegistry | `onEntityRemove()` for `PickupItemComponent` (v1.3.0) |
 | RespawnBlockSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `RespawnBlock` component |
 | ProcessingBenchSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `ProcessingBenchState` component |
 | InstancePositionTracker | `Listener` (EventHandler) | EventBus | `DrainPlayerFromWorldEvent`, `AddPlayerToWorldEvent` |
 | EmptyArchetypeSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `TransformComponent` |
 | ChunkUnloadManager | `ScheduledExecutorService` | N/A (background thread) | Reflection-based API discovery, 30s interval |
 | ChunkCleanupSystem | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every 600 ticks (30s), calls cleanup on main thread |
+| GatherObjectiveTaskSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates objective refs (v1.3.0) |
+| InteractionChainMonitor | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Tracks HyFixes statistics (v1.3.0) |
 
 ## Building
 

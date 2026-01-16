@@ -35,6 +35,21 @@ Hytale doesn't properly unload chunks when players move away, causing **unbounde
 - **Results:** Observed 77% reduction in loaded chunks (942 → 211) after fix
 - **Commands:** `/chunkstatus` (view chunk counts), `/chunkunload` (force cleanup)
 
+### GatherObjectiveTask Crash (Critical - v1.3.0)
+When a player has a quest/objective and the target entity despawns, the quest system **crashes**.
+- **Error:** `NullPointerException` in `GatherObjectiveTask.lambda$setup0$1` - null `ref`
+- **Fix:** Monitors objectives each tick via reflection and clears corrupted objectives before crash
+
+### Pickup Item Chunk Protection (Critical - v1.3.0)
+Backup protection for pickup item crashes during chunk unload events.
+- **Scenario:** Player teleports away rapidly while item is being picked up
+- **Fix:** RefSystem intercepts entity removal events and validates targetRef before crash cascade
+
+### HyFixes Status Command (v1.3.0)
+New admin command to view comprehensive HyFixes statistics.
+- **Command:** `/interactionstatus` (aliases: `/hyfixes`, `/hfs`)
+- **Shows:** Crashes prevented by type, memory stats, known unfixable Hytale bugs
+
 ## Installation
 
 1. Download `hyfixes-x.x.x.jar`
