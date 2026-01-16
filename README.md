@@ -105,7 +105,41 @@ This prevents the crash cascade from ever starting.
 
 ---
 
-### 4. Empty Archetype Entity Monitoring
+### 4. ExitInstance Missing Return World Crash
+
+**Severity:** Critical - Kicks the player who tried to exit the instance
+
+**The Bug:**
+
+Hytale's `InstancesPlugin.exitInstance()` at line 493 throws:
+```java
+throw new IllegalArgumentException("Missing return world");
+```
+when the return world reference is null or invalid.
+
+When a player exits an instance (dungeon, cave, etc.) and the return world data is corrupted or missing:
+
+```
+java.lang.IllegalArgumentException: Missing return world
+    at InstancesPlugin.exitInstance(InstancesPlugin.java:493)
+    at ExitInstanceInteraction.firstRun(ExitInstanceInteraction.java:44)
+```
+
+**Impact:** The player who tried to exit the instance is immediately kicked from the server.
+
+**The Fix:**
+
+`InstancePositionTracker` is an event listener that hooks into world transfer events. It:
+
+1. Saves the player's position when they leave a normal world to enter an instance
+2. When the player exits the instance, it sets the destination to the saved position
+3. If the return world was corrupted, the player still gets teleported back to where they were
+
+This ensures players always have a valid destination when exiting instances.
+
+---
+
+### 5. Empty Archetype Entity Monitoring
 
 **Severity:** Low - Informational logging only (no crash)
 
@@ -139,6 +173,7 @@ These occur due to:
 | PickupItemSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `PickupItemComponent` |
 | RespawnBlockSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `RespawnBlock` component |
 | ProcessingBenchSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `ProcessingBenchState` component |
+| InstancePositionTracker | `Listener` (EventHandler) | EventBus | `DrainPlayerFromWorldEvent`, `AddPlayerToWorldEvent` |
 | EmptyArchetypeSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `TransformComponent` |
 
 ## Building

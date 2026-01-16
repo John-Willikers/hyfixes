@@ -19,6 +19,11 @@ When a player breaks a campfire or crafting table while another player has it op
 - **Error:** `NullPointerException` in `BenchWindow.onClose0` - null `ref` during window close
 - **Fix:** Clears the windows map before the crash-causing close handlers run
 
+### Instance Exit Missing Return World (Critical)
+When a player exits an instance (dungeon, cave, etc.) and the return world data is corrupted, they get **kicked from the server**.
+- **Error:** `IllegalArgumentException` in `InstancesPlugin.exitInstance` - Missing return world
+- **Fix:** Tracks player position before entering instances and uses it as fallback destination
+
 ### Empty Archetype Entities (Monitoring)
 Logs entities with corrupted/empty component data for debugging. These don't crash but indicate world data issues.
 

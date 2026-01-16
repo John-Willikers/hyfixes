@@ -1,6 +1,7 @@
 package com.hyfixes;
 
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
+import com.hyfixes.listeners.InstancePositionTracker;
 import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
@@ -21,10 +22,12 @@ import java.util.logging.Level;
  * - RespawnBlockSanitizer: Prevents crash when breaking respawn blocks with null respawnPoints
  * - ProcessingBenchSanitizer: Prevents crash when breaking processing benches with open windows
  * - EmptyArchetypeSanitizer: Monitors for entities with invalid state (empty archetypes)
+ * - InstancePositionTracker: Prevents kick when exiting instances with missing return world
  */
 public class HyFixes extends JavaPlugin {
 
     private static HyFixes instance;
+    private InstancePositionTracker instancePositionTracker;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -62,6 +65,12 @@ public class HyFixes extends JavaPlugin {
         // Monitors for entities with invalid state (empty archetypes)
         getEntityStoreRegistry().registerSystem(new EmptyArchetypeSanitizer(this));
         getLogger().at(Level.INFO).log("[FIX] EmptyArchetypeSanitizer registered - monitors for invalid entity states");
+
+        // Fix 5: Instance exit missing return world crash
+        // Tracks player positions before entering instances and restores them if exit fails
+        instancePositionTracker = new InstancePositionTracker(this);
+        instancePositionTracker.register();
+        getLogger().at(Level.INFO).log("[FIX] InstancePositionTracker registered - prevents crash when exiting instances with missing return world");
     }
 
     @Override
@@ -75,7 +84,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 4; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer
+        return 5; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker
     }
 
     public static HyFixes getInstance() {
