@@ -1,0 +1,7 @@
+{
+  "Group": "com.hyfixes",
+  "Name": "HyFixes",
+  "Main": "com.hyfixes.HyFixes",
+  "Version": "1.0.0",
+  "Description": "Bug fixes for Hytale Early Access - Prevents world crashes from corrupted entities"
+}

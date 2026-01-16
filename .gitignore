@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build outputs
+*.jar
+!gradle-wrapper.jar
+
+# Dependencies (downloaded in CI)
+libs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc - decompiled/generated classes in root
+/com/
+
+# Hytale auth files (never commit these!)
+.hytale-auth-tokens.json
+.hytale-downloader-credentials.json
