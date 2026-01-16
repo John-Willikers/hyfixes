@@ -14,6 +14,11 @@ When a player breaks a bed or sleeping bag, they get **kicked from the server**.
 - **Error:** `NullPointerException` in `RespawnBlock$OnRemove` - null `respawnPoints` array
 - **Fix:** Initializes the respawn points array before Hytale's buggy code runs
 
+### ProcessingBench Window Crash (Critical)
+When a player breaks a campfire or crafting table while another player has it open, they get **kicked from the server**.
+- **Error:** `NullPointerException` in `BenchWindow.onClose0` - null `ref` during window close
+- **Fix:** Clears the windows map before the crash-causing close handlers run
+
 ### Empty Archetype Entities (Monitoring)
 Logs entities with corrupted/empty component data for debugging. These don't crash but indicate world data issues.
 

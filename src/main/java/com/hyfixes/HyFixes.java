@@ -2,6 +2,7 @@ package com.hyfixes;
 
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
 import com.hyfixes.listeners.PickupItemSanitizer;
+import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
@@ -18,6 +19,7 @@ import java.util.logging.Level;
  * Current fixes:
  * - PickupItemSanitizer: Prevents world thread crash from corrupted pickup items (null targetRef)
  * - RespawnBlockSanitizer: Prevents crash when breaking respawn blocks with null respawnPoints
+ * - ProcessingBenchSanitizer: Prevents crash when breaking processing benches with open windows
  * - EmptyArchetypeSanitizer: Monitors for entities with invalid state (empty archetypes)
  */
 public class HyFixes extends JavaPlugin {
@@ -51,7 +53,12 @@ public class HyFixes extends JavaPlugin {
         getChunkStoreRegistry().registerSystem(new RespawnBlockSanitizer(this));
         getLogger().at(Level.INFO).log("[FIX] RespawnBlockSanitizer registered - prevents crash when breaking respawn blocks");
 
-        // Fix 3: Empty archetype entity monitoring
+        // Fix 3: ProcessingBench window NPE crash
+        // Hytale's ProcessingBenchState.onDestroy() crashes when windows have null refs
+        getChunkStoreRegistry().registerSystem(new ProcessingBenchSanitizer(this));
+        getLogger().at(Level.INFO).log("[FIX] ProcessingBenchSanitizer registered - prevents crash when breaking benches with open windows");
+
+        // Fix 4: Empty archetype entity monitoring
         // Monitors for entities with invalid state (empty archetypes)
         getEntityStoreRegistry().registerSystem(new EmptyArchetypeSanitizer(this));
         getLogger().at(Level.INFO).log("[FIX] EmptyArchetypeSanitizer registered - monitors for invalid entity states");
@@ -68,7 +75,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 3; // PickupItemSanitizer, RespawnBlockSanitizer, EmptyArchetypeSanitizer
+        return 4; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer
     }
 
     public static HyFixes getInstance() {

@@ -71,7 +71,41 @@ This runs before Hytale's `RespawnBlock$OnRemove` system, preventing the crash.
 
 ---
 
-### 3. Empty Archetype Entity Monitoring
+### 3. ProcessingBench Window NPE Crash
+
+**Severity:** Critical - Kicks the player who had the window open
+
+**The Bug:**
+
+Hytale's `ProcessingBenchState.onDestroy()` at line 709 calls:
+```java
+WindowManager.closeAndRemoveAll()
+```
+which triggers window close handlers that try to access block data that's already being destroyed.
+
+When a player breaks a processing bench (campfire, crafting table, etc.) while another player has it open, the window close callbacks fail with:
+
+```
+java.lang.NullPointerException: Cannot invoke "...Ref.getStore()" because "ref" is null
+    at BenchWindow.onClose0(BenchWindow.java:83)
+    at ProcessingBenchWindow.onClose0(ProcessingBenchWindow.java:246)
+```
+
+**Impact:** The player who had the bench window open is immediately kicked from the server.
+
+**The Fix:**
+
+`ProcessingBenchSanitizer` is a `RefSystem` that hooks into the `ProcessingBenchState` component lifecycle. When a processing bench is about to be removed (not unloaded), it:
+
+1. Gets the windows map from the `ProcessingBenchState` component
+2. Clears the windows map before `onDestroy()` runs
+3. The `closeAndRemoveAll()` call finds an empty map and safely does nothing
+
+This prevents the crash cascade from ever starting.
+
+---
+
+### 4. Empty Archetype Entity Monitoring
 
 **Severity:** Low - Informational logging only (no crash)
 
@@ -104,6 +138,7 @@ These occur due to:
 |-----|-------------|----------|------------|
 | PickupItemSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `PickupItemComponent` |
 | RespawnBlockSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `RespawnBlock` component |
+| ProcessingBenchSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `ProcessingBenchState` component |
 | EmptyArchetypeSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `TransformComponent` |
 
 ## Building
