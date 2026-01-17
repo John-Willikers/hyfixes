@@ -55,6 +55,12 @@ When a player opens a processing bench while having a stale bench reference, the
 - **Error:** `IllegalArgumentException` in `CraftingManager.setBench` - Bench blockType is already set
 - **Fix:** Monitors players each tick and clears stale bench references before crash
 
+### InteractionManager NPE Crash (Critical - v1.3.1)
+When a player opens a crafttable at specific locations, they get **kicked from the server**.
+- **Error:** `NullPointerException` in `InteractionSystems$TickInteractionManagerSystem`
+- **Fix:** Validates interaction chains each tick and removes corrupted ones before crash
+- **GitHub Issue:** [#1](https://github.com/John-Willikers/hyfixes/issues/1)
+
 ## Installation
 
 1. Download `hyfixes-x.x.x.jar`

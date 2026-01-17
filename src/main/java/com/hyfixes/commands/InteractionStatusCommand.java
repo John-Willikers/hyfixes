@@ -3,6 +3,7 @@ package com.hyfixes.commands;
 import com.hyfixes.HyFixes;
 import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
+import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
@@ -115,6 +116,18 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
         if (craftingSanitizer != null) {
             sendMessage(player, "&6--- Crafting Manager Sanitizer ---");
             String status = craftingSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // InteractionManagerSanitizer status (Issue #1)
+        InteractionManagerSanitizer interactionSanitizer = plugin.getInteractionManagerSanitizer();
+        if (interactionSanitizer != null) {
+            sendMessage(player, "&6--- Interaction Manager Sanitizer ---");
+            String status = interactionSanitizer.getStatus();
             for (String line : status.split("\n")) {
                 sendMessage(player, "&7" + line);
             }

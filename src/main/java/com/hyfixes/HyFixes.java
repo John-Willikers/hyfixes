@@ -5,6 +5,7 @@ import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.commands.InteractionStatusCommand;
 import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
+import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
 import com.hyfixes.listeners.InstancePositionTracker;
 import com.hyfixes.listeners.PickupItemChunkHandler;
@@ -37,6 +38,7 @@ import java.util.logging.Level;
  * - GatherObjectiveTaskSanitizer: Prevents crash from null refs in quest objectives (v1.3.0)
  * - InteractionChainMonitor: Tracks unfixable Hytale bugs for reporting (v1.3.0)
  * - CraftingManagerSanitizer: Prevents crash from stale bench references (v1.3.1)
+ * - InteractionManagerSanitizer: Prevents NPE crash when opening crafttables (v1.3.1, Issue #1)
  */
 public class HyFixes extends JavaPlugin {
 
@@ -48,6 +50,7 @@ public class HyFixes extends JavaPlugin {
     private PickupItemChunkHandler pickupItemChunkHandler;
     private InteractionChainMonitor interactionChainMonitor;
     private CraftingManagerSanitizer craftingManagerSanitizer;
+    private InteractionManagerSanitizer interactionManagerSanitizer;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -131,6 +134,13 @@ public class HyFixes extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(craftingManagerSanitizer);
         getLogger().at(Level.INFO).log("[FIX] CraftingManagerSanitizer registered - prevents bench already set crash");
 
+        // Fix 11: InteractionManager NPE crash when opening crafttables (v1.3.1)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/1
+        // Validates interaction chains and removes ones with null context before they cause NPE
+        interactionManagerSanitizer = new InteractionManagerSanitizer(this);
+        getEntityStoreRegistry().registerSystem(interactionManagerSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] InteractionManagerSanitizer registered - prevents crafttable interaction crash");
+
         // Register admin commands
         registerCommands();
     }
@@ -157,7 +167,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 11; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer
+        return 12; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer
     }
 
     public static HyFixes getInstance() {
@@ -204,5 +214,12 @@ public class HyFixes extends JavaPlugin {
      */
     public CraftingManagerSanitizer getCraftingManagerSanitizer() {
         return craftingManagerSanitizer;
+    }
+
+    /**
+     * Get the InteractionManagerSanitizer for commands and status.
+     */
+    public InteractionManagerSanitizer getInteractionManagerSanitizer() {
+        return interactionManagerSanitizer;
     }
 }

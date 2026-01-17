@@ -12,6 +12,12 @@ All notable changes to HyFixes will be documented in this file.
   - Clears stale bench references before `setBench()` can throw IllegalArgumentException
   - Error: `Bench blockType is already set! Must be cleared (close UI)` at `CraftingManager.java:157`
 
+- **InteractionManagerSanitizer** - Prevents player kick when opening crafttables at specific locations
+  - GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/1
+  - Validates all interaction chains each tick for null context or invalid refs
+  - Removes corrupted chains before `TickInteractionManagerSystem` can crash on them
+  - Error: `NullPointerException` in `InteractionSystems$TickInteractionManagerSystem`
+
 #### Documentation
 - **HYTALE_CORE_BUGS.md** - Comprehensive documentation of Hytale core bugs that cannot be fixed at plugin level
   - InteractionChain Sync Buffer Overflow (with decompiled bytecode analysis)
@@ -21,9 +27,10 @@ All notable changes to HyFixes will be documented in this file.
   - Includes reproduction steps and suggested fixes for Hytale developers
 
 ### Technical Details
-- Total active bug fixes increased from 10 to 11
-- New system uses EntityTickingSystem pattern on Player entities
+- Total active bug fixes increased from 10 to 12
+- New systems use EntityTickingSystem pattern on Player entities
 - CraftingManagerSanitizer uses runtime reflection for component discovery
+- InteractionManagerSanitizer validates InteractionChain context and refs
 
 ---
 

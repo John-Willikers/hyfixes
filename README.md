@@ -292,6 +292,36 @@ java.lang.IllegalArgumentException: Bench blockType is already set! Must be clea
 
 ---
 
+### 11. InteractionManager NPE Crash (v1.3.1)
+
+**Severity:** Critical - Kicks the player who tried to interact
+
+**GitHub Issue:** https://github.com/John-Willikers/hyfixes/issues/1
+
+**The Bug:**
+
+When a player opens a crafttable at specific locations, the `InteractionManager` can end up with chains containing null context data. When `TickInteractionManagerSystem` tries to tick these chains, it throws a NullPointerException and **kicks the player**.
+
+```
+[SEVERE] [InteractionSystems$TickInteractionManagerSystem] Exception while ticking entity interactions! Removing!
+java.lang.NullPointerException
+```
+
+**Impact:** The player who tried to open the crafttable is immediately kicked from the server with "Player removed from world!"
+
+**The Fix:**
+
+`InteractionManagerSanitizer` is an `EntityTickingSystem` that validates all interaction chains each tick. It uses reflection to:
+
+1. Access the `InteractionManager` component on each player
+2. Iterate through all active chains
+3. Check if context is null or owningEntity ref is invalid
+4. Remove corrupted chains before they can cause a crash
+
+This runs before `TickInteractionManagerSystem` can process the invalid chains.
+
+---
+
 ## Technical Details
 
 | Fix | System Type | Registry | Hook Point |
@@ -307,6 +337,7 @@ java.lang.IllegalArgumentException: Bench blockType is already set! Must be clea
 | GatherObjectiveTaskSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates objective refs (v1.3.0) |
 | InteractionChainMonitor | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Tracks HyFixes statistics (v1.3.0) |
 | CraftingManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, clears stale bench refs (v1.3.1) |
+| InteractionManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates interaction chains (v1.3.1) |
 
 ## Building
 
