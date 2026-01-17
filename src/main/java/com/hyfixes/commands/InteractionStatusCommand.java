@@ -6,7 +6,6 @@ import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
 import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
-import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
 import com.hyfixes.listeners.ChunkTrackerSanitizer;
 import com.hyfixes.listeners.InstanceTeleportSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
@@ -152,14 +151,11 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
         sendMessage(player, "");
 
         // SpawnMarkerReferenceSanitizer status (Issue #5)
-        SpawnMarkerReferenceSanitizer markerSanitizer = plugin.getSpawnMarkerReferenceSanitizer();
-        if (markerSanitizer != null) {
-            sendMessage(player, "&6--- Spawn Marker Reference Sanitizer ---");
-            String status = markerSanitizer.getStatus();
-            for (String line : status.split("\n")) {
-                sendMessage(player, "&7" + line);
-            }
-        }
+        // MOVED TO EARLY PLUGIN in v1.4.0 - Now fixed via bytecode transformation
+        sendMessage(player, "&6--- Spawn Marker Reference Sanitizer ---");
+        sendMessage(player, "&aMOVED to Early Plugin (v1.4.0)");
+        sendMessage(player, "&7Now fixed via bytecode transformation in hyfixes-early");
+        sendMessage(player, "&7SpawnMarkerEntity constructor initializes npcReferences to empty array");
 
         sendMessage(player, "");
 

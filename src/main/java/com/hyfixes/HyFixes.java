@@ -14,7 +14,6 @@ import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
-import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
 import com.hyfixes.listeners.ChunkTrackerSanitizer;
 import com.hyfixes.listeners.InstanceTeleportSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
@@ -45,7 +44,7 @@ import java.util.logging.Level;
  * - CraftingManagerSanitizer: Prevents crash from stale bench references (v1.3.1)
  * - InteractionManagerSanitizer: Prevents NPE crash when opening crafttables (v1.3.1, Issue #1)
  * - SpawnBeaconSanitizer: Prevents crash from null spawn parameters in BeaconSpawnController (v1.3.7, Issue #4)
- * - SpawnMarkerReferenceSanitizer: Prevents crash from null npcReferences in SpawnMarkerEntity (v1.3.8, Issue #5)
+ * - [MOVED TO EARLY PLUGIN] SpawnMarkerReferenceSanitizer: Now fixed via bytecode transformation (v1.4.0)
  * - ChunkTrackerSanitizer: Prevents crash from invalid PlayerRefs during chunk unload (v1.3.9, Issue #6)
  * - InstanceTeleportSanitizer: Monitors and handles instance portal race conditions (v1.3.10, Issue #7)
  */
@@ -61,7 +60,6 @@ public class HyFixes extends JavaPlugin {
     private CraftingManagerSanitizer craftingManagerSanitizer;
     private InteractionManagerSanitizer interactionManagerSanitizer;
     private SpawnBeaconSanitizer spawnBeaconSanitizer;
-    private SpawnMarkerReferenceSanitizer spawnMarkerReferenceSanitizer;
     private ChunkTrackerSanitizer chunkTrackerSanitizer;
     private InstanceTeleportSanitizer instanceTeleportSanitizer;
 
@@ -163,10 +161,9 @@ public class HyFixes extends JavaPlugin {
 
         // Fix 13: SpawnMarkerReference null npcReferences crash (v1.3.8)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/5
-        // Prevents world crash when SpawnMarkerEntity has null npcReferences array
-        spawnMarkerReferenceSanitizer = new SpawnMarkerReferenceSanitizer(this);
-        getEntityStoreRegistry().registerSystem(spawnMarkerReferenceSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] SpawnMarkerReferenceSanitizer registered - prevents spawn marker null array crash");
+        // MOVED TO EARLY PLUGIN in v1.4.0 - Now fixed via bytecode transformation
+        // The early plugin transforms SpawnMarkerEntity constructor to initialize npcReferences
+        getLogger().at(Level.INFO).log("[MOVED] SpawnMarkerReferenceSanitizer - now fixed via early plugin bytecode transformation");
 
         // Fix 14: ChunkTracker null PlayerRef crash (v1.3.9)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/6
@@ -212,7 +209,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 15; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer, ChunkTrackerSanitizer (InstanceTeleportSanitizer disabled)
+        return 14; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, ChunkTrackerSanitizer (SpawnMarkerReferenceSanitizer moved to early plugin, InstanceTeleportSanitizer disabled)
     }
 
     public static HyFixes getInstance() {
@@ -273,13 +270,6 @@ public class HyFixes extends JavaPlugin {
      */
     public SpawnBeaconSanitizer getSpawnBeaconSanitizer() {
         return spawnBeaconSanitizer;
-    }
-
-    /**
-     * Get the SpawnMarkerReferenceSanitizer for commands and status.
-     */
-    public SpawnMarkerReferenceSanitizer getSpawnMarkerReferenceSanitizer() {
-        return spawnMarkerReferenceSanitizer;
     }
 
     /**
