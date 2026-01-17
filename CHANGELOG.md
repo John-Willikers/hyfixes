@@ -2,6 +2,41 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.3] - 2026-01-17
+
+### Fixed
+
+#### GatherObjectiveTaskSanitizer API Discovery Fix
+- **Fixed incorrect class name lookups** - Sanitizer was searching for classes that don't exist:
+  - Old: `ObjectiveComponent`, `PlayerObjectives`, `ObjectiveManager`
+  - New: `ObjectiveDataStore`, `GatherObjectiveTask`
+- Updated API discovery to use correct Hytale package paths:
+  - `com.hypixel.hytale.builtin.adventure.objectives.ObjectiveDataStore`
+  - `com.hypixel.hytale.builtin.adventure.objectives.task.GatherObjectiveTask`
+- Added field introspection to find tasks collection and target ref fields
+- Enhanced logging to show all discovered methods and fields for debugging
+- Now properly validates tasks within ObjectiveDataStore component
+
+### Added
+
+#### Client Timeout Protection (InteractionManagerSanitizer)
+- **New feature:** Proactively detect and cancel chains waiting too long for client data
+- Prevents player kicks from "Client took too long to send clientData" errors
+- Error: `RuntimeException: Client took too long to send clientData` at `InteractionChain.java:207`
+- Tracks chains in WAITING_FOR_CLIENT_DATA state and removes them after 2500ms (before Hytale's ~3 second kick)
+- Uses reflection to discover CallState enum and chain state field
+- New stat "Timeouts Prevented" shown in `/interactionstatus` command
+
+### Technical Details
+- Discovery now finds component type from ObjectiveDataStore
+- Checks both methods (`getTasks`, `getActiveTasks`) and fields (`tasks`, `activeTasks`)
+- Logs all fields and methods on discovered classes for future debugging
+- Status command now shows detailed discovery results
+- InteractionManagerSanitizer now tracks chain waiting times in ConcurrentHashMap
+- Client timeout threshold set to 2500ms (configurable via constant)
+
+---
+
 ## [1.3.2] - 2026-01-17
 
 ### Fixed

@@ -61,6 +61,11 @@ When a player opens a crafttable at specific locations, they get **kicked from t
 - **Fix:** Validates interaction chains each tick and removes corrupted ones before crash
 - **GitHub Issue:** [#1](https://github.com/John-Willikers/hyfixes/issues/1)
 
+### Client Timeout Protection (Critical - v1.3.3)
+When an interaction chain waits too long for client data, the player gets **kicked from the server**.
+- **Error:** `RuntimeException: Client took too long to send clientData` at `InteractionChain.java:207`
+- **Fix:** Proactively detects chains waiting too long (>2.5 seconds) and removes them before Hytale kicks the player
+
 ## Installation
 
 1. Download `hyfixes-x.x.x.jar`

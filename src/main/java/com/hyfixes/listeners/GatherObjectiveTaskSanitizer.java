@@ -43,11 +43,14 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
     private int fixedCount = 0;
 
     // Discovered at runtime via reflection
-    private Class<?> objectiveComponentClass = null;
+    private Class<?> objectiveDataStoreClass = null;
+    private Class<?> gatherObjectiveTaskClass = null;
     @SuppressWarnings("rawtypes")
-    private ComponentType objectiveComponentType = null;
+    private ComponentType objectiveDataStoreType = null;
     private Method getActiveObjectivesMethod = null;
     private Method getTasksMethod = null;
+    private Field tasksField = null;
+    private Field targetRefField = null;
 
     public GatherObjectiveTaskSanitizer(HyFixes plugin) {
         this.plugin = plugin;
@@ -84,8 +87,8 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
             return;
         }
 
-        // Skip if we couldn't find the objective component
-        if (objectiveComponentType == null) {
+        // Skip if we couldn't find the objective data store component
+        if (objectiveDataStoreType == null) {
             return;
         }
 
@@ -122,45 +125,121 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
         );
 
         try {
-            // Try to find ObjectiveComponent or similar
-            String[] possibleClasses = {
-                "com.hypixel.hytale.builtin.adventure.objectives.ObjectiveComponent",
-                "com.hypixel.hytale.builtin.adventure.objectives.PlayerObjectives",
-                "com.hypixel.hytale.builtin.adventure.objectives.ObjectiveManager",
-                "com.hypixel.hytale.server.core.modules.adventure.ObjectiveComponent"
+            // Step 1: Find ObjectiveDataStore (the component on players)
+            String[] dataStoreClasses = {
+                "com.hypixel.hytale.builtin.adventure.objectives.ObjectiveDataStore",
+                "com.hypixel.hytale.server.core.modules.adventure.ObjectiveDataStore"
             };
 
-            for (String className : possibleClasses) {
+            for (String className : dataStoreClasses) {
                 try {
-                    objectiveComponentClass = Class.forName(className);
+                    objectiveDataStoreClass = Class.forName(className);
                     plugin.getLogger().at(Level.INFO).log(
-                        "[GatherObjectiveTaskSanitizer] Found class: " + className
+                        "[GatherObjectiveTaskSanitizer] Found ObjectiveDataStore: " + className
                     );
-
-                    // Try to get component type
-                    try {
-                        Method getTypeMethod = objectiveComponentClass.getMethod("getComponentType");
-                        objectiveComponentType = (ComponentType) getTypeMethod.invoke(null);
-                        plugin.getLogger().at(Level.INFO).log(
-                            "[GatherObjectiveTaskSanitizer] Got component type from: " + className
-                        );
-                    } catch (NoSuchMethodException e) {
-                        // Not a component, keep searching
-                    }
-
-                    // Log available methods for debugging
-                    logClassMethods(objectiveComponentClass);
                     break;
-
                 } catch (ClassNotFoundException e) {
-                    // Try next class
+                    // Try next
                 }
             }
 
-            if (objectiveComponentClass == null) {
+            // Step 2: Find GatherObjectiveTask (the task that crashes)
+            String[] taskClasses = {
+                "com.hypixel.hytale.builtin.adventure.objectives.task.GatherObjectiveTask",
+                "com.hypixel.hytale.builtin.adventure.npcobjectives.task.GatherObjectiveTask"
+            };
+
+            for (String className : taskClasses) {
+                try {
+                    gatherObjectiveTaskClass = Class.forName(className);
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[GatherObjectiveTaskSanitizer] Found GatherObjectiveTask: " + className
+                    );
+                    break;
+                } catch (ClassNotFoundException e) {
+                    // Try next
+                }
+            }
+
+            // Step 3: Get component type from ObjectiveDataStore
+            if (objectiveDataStoreClass != null) {
+                try {
+                    Method getTypeMethod = objectiveDataStoreClass.getMethod("getComponentType");
+                    objectiveDataStoreType = (ComponentType) getTypeMethod.invoke(null);
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[GatherObjectiveTaskSanitizer] Got ObjectiveDataStore component type"
+                    );
+                } catch (NoSuchMethodException e) {
+                    plugin.getLogger().at(Level.WARNING).log(
+                        "[GatherObjectiveTaskSanitizer] ObjectiveDataStore has no getComponentType()"
+                    );
+                }
+
+                // Log methods for debugging
+                logClassMethods(objectiveDataStoreClass);
+
+                // Step 4: Find method to get tasks from ObjectiveDataStore
+                String[] taskMethods = {"getTasks", "getActiveTasks", "getObjectives", "getActiveObjectives"};
+                for (String methodName : taskMethods) {
+                    try {
+                        getTasksMethod = objectiveDataStoreClass.getMethod(methodName);
+                        plugin.getLogger().at(Level.INFO).log(
+                            "[GatherObjectiveTaskSanitizer] Found tasks getter: " + methodName + "()"
+                        );
+                        break;
+                    } catch (NoSuchMethodException e) {
+                        // Try next
+                    }
+                }
+
+                // Step 5: Find tasks field directly
+                String[] taskFields = {"tasks", "activeTasks", "objectives", "activeObjectives"};
+                for (String fieldName : taskFields) {
+                    try {
+                        tasksField = objectiveDataStoreClass.getDeclaredField(fieldName);
+                        tasksField.setAccessible(true);
+                        plugin.getLogger().at(Level.INFO).log(
+                            "[GatherObjectiveTaskSanitizer] Found tasks field: " + fieldName
+                        );
+                        break;
+                    } catch (NoSuchFieldException e) {
+                        // Try next
+                    }
+                }
+            }
+
+            // Step 6: Find targetRef field in GatherObjectiveTask
+            if (gatherObjectiveTaskClass != null) {
+                logClassMethods(gatherObjectiveTaskClass);
+                logClassFields(gatherObjectiveTaskClass);
+
+                String[] refFields = {"targetRef", "ref", "entityRef", "target"};
+                for (String fieldName : refFields) {
+                    try {
+                        targetRefField = gatherObjectiveTaskClass.getDeclaredField(fieldName);
+                        targetRefField.setAccessible(true);
+                        plugin.getLogger().at(Level.INFO).log(
+                            "[GatherObjectiveTaskSanitizer] Found target ref field: " + fieldName
+                        );
+                        break;
+                    } catch (NoSuchFieldException e) {
+                        // Try next
+                    }
+                }
+            }
+
+            // Summary
+            if (objectiveDataStoreClass == null && gatherObjectiveTaskClass == null) {
                 plugin.getLogger().at(Level.WARNING).log(
-                    "[GatherObjectiveTaskSanitizer] Could not find objective component class. " +
+                    "[GatherObjectiveTaskSanitizer] Could not find any objective classes. " +
                     "Will monitor Player entities only."
+                );
+            } else {
+                plugin.getLogger().at(Level.INFO).log(
+                    "[GatherObjectiveTaskSanitizer] API Discovery complete: " +
+                    "DataStore=" + (objectiveDataStoreClass != null ? "YES" : "NO") +
+                    ", Task=" + (gatherObjectiveTaskClass != null ? "YES" : "NO") +
+                    ", ComponentType=" + (objectiveDataStoreType != null ? "YES" : "NO")
                 );
             }
 
@@ -169,6 +248,21 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
                 "[GatherObjectiveTaskSanitizer] Discovery failed: " + e.getMessage()
             );
             discoveryFailed = true;
+        }
+    }
+
+    /**
+     * Log fields of a class for debugging/discovery.
+     */
+    private void logClassFields(Class<?> clazz) {
+        plugin.getLogger().at(Level.INFO).log(
+            "[GatherObjectiveTaskSanitizer] Fields on " + clazz.getSimpleName() + ":"
+        );
+        for (Field f : clazz.getDeclaredFields()) {
+            String name = f.getName();
+            plugin.getLogger().at(Level.INFO).log(
+                "  - " + name + ": " + f.getType().getSimpleName()
+            );
         }
     }
 
@@ -211,19 +305,48 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
             ArchetypeChunk<EntityStore> chunk,
             int entityIndex
     ) {
-        if (objectiveComponentType == null || objectiveComponentClass == null) {
+        if (objectiveDataStoreType == null || objectiveDataStoreClass == null) {
             return;
         }
 
         try {
-            // Try to get the objective component
-            Object objectiveComponent = chunk.getComponent(entityIndex, objectiveComponentType);
-            if (objectiveComponent == null) {
+            // Try to get the ObjectiveDataStore component from the player
+            Object dataStore = chunk.getComponent(entityIndex, objectiveDataStoreType);
+            if (dataStore == null) {
                 return;
             }
 
-            // Use reflection to check for null refs in the objective
-            validateObjectiveRefs(objectiveComponent);
+            // Get tasks from the data store
+            Object tasks = null;
+            if (getTasksMethod != null) {
+                tasks = getTasksMethod.invoke(dataStore);
+            } else if (tasksField != null) {
+                tasks = tasksField.get(dataStore);
+            }
+
+            if (tasks == null) {
+                // Try direct validation on the dataStore itself
+                validateObjectiveRefs(dataStore);
+                return;
+            }
+
+            // If tasks is iterable, check each task
+            if (tasks instanceof Iterable) {
+                for (Object task : (Iterable<?>) tasks) {
+                    if (task != null) {
+                        validateObjectiveRefs(task);
+                    }
+                }
+            } else if (tasks.getClass().isArray()) {
+                for (Object task : (Object[]) tasks) {
+                    if (task != null) {
+                        validateObjectiveRefs(task);
+                    }
+                }
+            } else {
+                // Single task? Validate it
+                validateObjectiveRefs(tasks);
+            }
 
         } catch (Exception e) {
             // Silently fail - we're just trying to prevent crashes
@@ -324,13 +447,17 @@ public class GatherObjectiveTaskSanitizer extends EntityTickingSystem<EntityStor
             "GatherObjectiveTaskSanitizer Status:\n" +
             "  Discovery Complete: %s\n" +
             "  Discovery Failed: %s\n" +
-            "  Objective Class Found: %s\n" +
+            "  ObjectiveDataStore Found: %s\n" +
+            "  GatherObjectiveTask Found: %s\n" +
             "  Component Type Found: %s\n" +
+            "  Tasks Field/Method Found: %s\n" +
             "  Objectives Fixed: %d",
             discoveryComplete,
             discoveryFailed,
-            objectiveComponentClass != null ? objectiveComponentClass.getSimpleName() : "None",
-            objectiveComponentType != null,
+            objectiveDataStoreClass != null ? objectiveDataStoreClass.getSimpleName() : "None",
+            gatherObjectiveTaskClass != null ? gatherObjectiveTaskClass.getSimpleName() : "None",
+            objectiveDataStoreType != null,
+            (tasksField != null || getTasksMethod != null),
             fixedCount
         );
     }
