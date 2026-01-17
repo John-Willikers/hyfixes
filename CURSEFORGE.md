@@ -23,7 +23,7 @@ HyFixes consists of two plugins that work together:
 The main plugin that fixes most crashes.
 
 1. Download `hyfixes.jar`
-2. Place in your server's `plugins/` folder
+2. Place in your server's `mods/` folder
 3. Restart the server
 
 ### Early Plugin (Recommended)
@@ -101,7 +101,7 @@ Aliases: `/hfs`, `/interactionstatus`
 ### Plugin not loading
 
 1. Check that the JAR is in the correct folder:
-   - Runtime plugin: `plugins/hyfixes.jar`
+   - Runtime plugin: `mods/hyfixes.jar`
    - Early plugin: `earlyplugins/hyfixes-early.jar`
 
 2. Check server logs for errors during startup

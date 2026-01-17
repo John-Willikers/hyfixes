@@ -138,8 +138,31 @@ public class InstancePositionTracker {
         }
 
         // Case 2: Player is leaving an INSTANCE world
-        // Always set a fallback destination to prevent "Missing return world" crash
+        // ONLY set a fallback destination if Hytale's return world is missing/null
+        // Previously we always overwrote the destination, which could cause state issues
         if (sourceWorldName.startsWith(InstancesPlugin.INSTANCE_PREFIX)) {
+            // First, check if Hytale already has a valid return destination
+            World existingDestination = null;
+            try {
+                // Try to get the event's current destination world
+                existingDestination = event.getWorld();
+            } catch (Exception e) {
+                // Method might not exist or might throw - that's ok
+            }
+
+            // If Hytale already has a valid destination, don't interfere!
+            if (existingDestination != null) {
+                plugin.getLogger().at(Level.FINE).log(
+                    "[InstancePositionTracker] Player exiting instance - Hytale has valid return world '" +
+                    existingDestination.getName() + "', not interfering"
+                );
+                // Clean up our saved position since it's not needed
+                savedPositions.remove(playerUuid);
+                return;
+            }
+
+            // Hytale's destination is null - this is where the crash would happen
+            // Now we try to provide a fallback
             SavedPosition savedPos = savedPositions.get(playerUuid);
 
             if (savedPos != null && savedPos.isValid()) {
@@ -153,7 +176,7 @@ public class InstancePositionTracker {
 
                     recoveryCount++;
                     plugin.getLogger().at(Level.INFO).log(
-                        "[InstancePositionTracker] Set return destination for player to saved position in '" +
+                        "[InstancePositionTracker] RECOVERY: Hytale had null return world, set destination to saved position in '" +
                         savedPos.getWorldName() + "' (recovery #" + recoveryCount + ")"
                     );
 
@@ -167,8 +190,8 @@ public class InstancePositionTracker {
                 }
             } else {
                 plugin.getLogger().at(Level.WARNING).log(
-                    "[InstancePositionTracker] Player exiting instance but no valid saved position available. " +
-                    "Instance exit may fail if return world is missing!"
+                    "[InstancePositionTracker] Player exiting instance but Hytale's return world is null and no valid saved position available. " +
+                    "Instance exit may fail!"
                 );
             }
         }

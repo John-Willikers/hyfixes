@@ -423,6 +423,56 @@ if (index >= tempSyncDataOffset) {
 
 ---
 
+### 15. World.addPlayer() Instance Teleport Race Condition (v1.4.1-early)
+
+**Severity:** Critical - Kicks the player trying to enter an instance portal
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/7
+
+Hytale's `World.addPlayer()` throws an exception when a player enters an instance portal but hasn't been fully removed from their previous world yet:
+
+```java
+// Original buggy code at World.java:1008
+if (playerRef.getReference() != null) {
+    throw new IllegalStateException("Player is already in a world");
+}
+```
+
+Error seen in logs:
+```
+java.lang.IllegalStateException: Player is already in a world
+    at World.addPlayer(World.java:1008)
+    at InstancesPlugin.teleportPlayerToLoadingInstance(InstancesPlugin.java:403)
+```
+
+**Root Cause:**
+
+Hytale's `InstancesPlugin.teleportPlayerToLoadingInstance()` uses async/CompletableFuture code that has a race condition:
+1. Instance world is created/loaded
+2. Hytale tries to add player to instance world via `World.addPlayer()`
+3. But player hasn't been drained from their current world yet
+4. `World.addPlayer()` checks if player reference is non-null and throws
+
+**Impact:** Player is immediately kicked with "Failed to send player to instance world" error.
+
+**The Fix:**
+
+The early plugin transforms `World.addPlayer()` to handle this case gracefully:
+
+```java
+// Fixed - log warning and continue instead of throwing
+if (playerRef.getReference() != null) {
+    System.out.println("[HyFixes-Early] Warning: Player still in world, proceeding anyway");
+    // Continue - Hytale's drain logic will clean up the old reference
+}
+```
+
+The bytecode transformation intercepts the `ATHROW` instruction for the "Player is already in a world" exception and replaces it with a warning log and continues execution.
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -450,6 +500,7 @@ if (index >= tempSyncDataOffset) {
 |-------------|--------------|---------------|----------------|
 | InteractionChainTransformer | `InteractionChain` | `putInteractionSyncData` | Full method replacement |
 | InteractionChainTransformer | `InteractionChain` | `updateSyncPosition` | Full method replacement |
+| WorldTransformer | `World` | `addPlayer` | Exception throw replaced with warning log |
 
 ---
 

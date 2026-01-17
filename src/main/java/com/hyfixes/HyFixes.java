@@ -177,10 +177,13 @@ public class HyFixes extends JavaPlugin {
 
         // Fix 15: Instance teleport race condition (v1.3.10)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/7
-        // Monitors and handles race conditions when teleporting to instance worlds
-        instanceTeleportSanitizer = new InstanceTeleportSanitizer(this);
-        instanceTeleportSanitizer.register();
-        getLogger().at(Level.INFO).log("[FIX] InstanceTeleportSanitizer registered - monitors instance portal race conditions");
+        // DISABLED in v1.4.1 - This sanitizer was causing timing issues that led to
+        // the race condition being triggered MORE often after plugin removal.
+        // The underlying bug is a Hytale race condition in World.addPlayer() that
+        // cannot be safely fixed at the plugin level.
+        // instanceTeleportSanitizer = new InstanceTeleportSanitizer(this);
+        // instanceTeleportSanitizer.register();
+        getLogger().at(Level.INFO).log("[DISABLED] InstanceTeleportSanitizer - race condition cannot be safely fixed at plugin level");
 
         // Register admin commands
         registerCommands();
@@ -209,7 +212,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 16; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer, ChunkTrackerSanitizer, InstanceTeleportSanitizer
+        return 15; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer, ChunkTrackerSanitizer (InstanceTeleportSanitizer disabled)
     }
 
     public static HyFixes getInstance() {

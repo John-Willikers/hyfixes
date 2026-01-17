@@ -21,6 +21,11 @@ import java.util.logging.Level;
  * are called from the main server thread, avoiding InvocationTargetExceptions.
  *
  * It runs every CLEANUP_INTERVAL_TICKS ticks (default: 600 = 30 seconds at 20 TPS)
+ *
+ * NOTE: We only call invalidateLoadedChunks() here. The waitForLoadingChunks()
+ * method was removed because calling it from within a system tick causes
+ * "Store is currently processing!" errors - the Store's task queue contains
+ * operations that try to modify entities while we're still inside Store.tick().
  */
 public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
 
@@ -38,10 +43,9 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     private boolean hasRunOnce = false;
 
     // Cached method references (set by ChunkUnloadManager)
-    private Object chunkStoreInstance = null;
+    // NOTE: chunkStoreInstance/waitForLoadingChunks removed - causes "Store is currently processing!" errors
     private Object chunkLightingInstance = null;
     private Method invalidateLoadedChunksMethod = null;
-    private Method waitForLoadingChunksMethod = null;
 
     public ChunkCleanupSystem(HyFixes plugin) {
         this.plugin = plugin;
@@ -114,22 +118,9 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             }
         }
 
-        // Try waitForLoadingChunks()
-        if (chunkStoreInstance != null && waitForLoadingChunksMethod != null) {
-            try {
-                waitForLoadingChunksMethod.invoke(chunkStoreInstance);
-                successes++;
-                plugin.getLogger().at(Level.INFO).log(
-                    "[ChunkCleanupSystem] SUCCESS: Called waitForLoadingChunks() on main thread"
-                );
-            } catch (Exception e) {
-                String cause = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-                plugin.getLogger().at(Level.WARNING).log(
-                    "[ChunkCleanupSystem] Failed waitForLoadingChunks(): " +
-                    e.getClass().getSimpleName() + " - " + cause
-                );
-            }
-        }
+        // NOTE: waitForLoadingChunks() was removed - calling it from within a system tick
+        // causes "Store is currently processing!" errors because the task queue contains
+        // operations that try to modify entities while we're still inside Store.tick().
 
         if (successes > 0) {
             successCount.addAndGet(successes);
@@ -138,7 +129,6 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
         if (!hasRunOnce) {
             plugin.getLogger().at(Level.INFO).log(
                 "[ChunkCleanupSystem] First cleanup cycle complete. " +
-                "ChunkStore: " + (chunkStoreInstance != null) + ", " +
                 "ChunkLighting: " + (chunkLightingInstance != null)
             );
             hasRunOnce = true;
@@ -146,29 +136,11 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     }
 
     /**
-     * Set the ChunkStore instance for cleanup operations.
-     * Called by ChunkUnloadManager after API discovery.
-     */
-    public void setChunkStoreInstance(Object instance) {
-        this.chunkStoreInstance = instance;
-        if (instance != null) {
-            try {
-                waitForLoadingChunksMethod = instance.getClass().getMethod("waitForLoadingChunks");
-                waitForLoadingChunksMethod.setAccessible(true);
-                plugin.getLogger().at(Level.INFO).log(
-                    "[ChunkCleanupSystem] Registered ChunkStore with waitForLoadingChunks()"
-                );
-            } catch (NoSuchMethodException e) {
-                plugin.getLogger().at(Level.WARNING).log(
-                    "[ChunkCleanupSystem] ChunkStore does not have waitForLoadingChunks() method"
-                );
-            }
-        }
-    }
-
-    /**
      * Set the ChunkLightingManager instance for cleanup operations.
      * Called by ChunkUnloadManager after API discovery.
+     *
+     * NOTE: setChunkStoreInstance() was removed - waitForLoadingChunks() causes
+     * "Store is currently processing!" errors when called from a system tick.
      */
     public void setChunkLightingInstance(Object instance) {
         this.chunkLightingInstance = instance;
@@ -198,13 +170,11 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
 
         return String.format(
             "ChunkCleanupSystem Status (MAIN THREAD):\n" +
-            "  ChunkStore Ready: %s\n" +
             "  ChunkLighting Ready: %s\n" +
             "  Total Cleanups: %d\n" +
             "  Successful Calls: %d\n" +
             "  Last Cleanup: %s\n" +
             "  Interval: %d seconds",
-            chunkStoreInstance != null && waitForLoadingChunksMethod != null,
             chunkLightingInstance != null && invalidateLoadedChunksMethod != null,
             cleanupCount.get(),
             successCount.get(),

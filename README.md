@@ -27,7 +27,7 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 ### Runtime Plugin (Required)
 
 1. Download `hyfixes.jar` from [Releases](https://github.com/John-Willikers/hyfixes/releases)
-2. Place in your server's `plugins/` directory
+2. Place in your server's `mods/` directory
 3. Restart the server
 
 ### Early Plugin (Recommended)

@@ -2,6 +2,89 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.4.3] - 2026-01-17
+
+### Added
+
+#### BlockComponentChunk Duplicate Fix (Early Plugin)
+- **Target:** `BlockComponentChunk.addEntityReference()`
+- **Bug:** `IllegalArgumentException: Duplicate block components at: [position]`
+- **Crash location:** `BlockComponentChunk.addEntityReference()` at line 329
+- **Root cause:** When interacting with teleporters, Hytale sometimes tries to add a block component entity reference that already exists
+- **Fix:** Bytecode transformation makes `addEntityReference()` idempotent - logs warning and returns instead of throwing
+- **Impact:** Prevents player kicks when interacting with teleporters
+- **Related:** [GitHub Issue #8](https://github.com/John-Willikers/hyfixes/issues/8)
+
+---
+
+## [1.4.2] - 2026-01-17
+
+### Added
+
+#### BeaconSpawnController Null Spawn Fix (Early Plugin)
+- **Target:** `BeaconSpawnController.createRandomSpawnJob()`
+- **Bug:** `NullPointerException: Cannot invoke "RoleSpawnParameters.getId()" because "spawn" is null`
+- **Crash location:** `BeaconSpawnController.createRandomSpawnJob()` at line 110
+- **Root cause:** Spawn beacons in volcanic/cave biomes can have misconfigured or missing spawn types, passing null `RoleSpawnParameters` to createRandomSpawnJob()
+- **Fix:** Bytecode transformation adds null check at method entry - returns null gracefully instead of crashing
+- **Impact:** Prevents server crashes when players explore volcanic/red cave biomes with spawn beacon issues
+
+---
+
+## [1.4.1] - 2026-01-17
+
+### Fixed
+
+#### ChunkCleanupSystem "Store is currently processing!" Error
+- **Root Cause:** Our own `ChunkCleanupSystem` was calling `waitForLoadingChunks()` from within a system tick
+- **The Problem:** This caused 100+ "Store is currently processing!" errors because the Store's task queue contains operations that try to modify entities while we're still inside `Store.tick()`
+- **The Fix:** Removed `waitForLoadingChunks()` call from the system - only `invalidateLoadedChunks()` is called now (which works safely)
+- **Impact:** Eliminates chunk loading errors that were appearing in server logs
+
+#### Instance Portal Issue After Plugin Removal (Issue #7 Update)
+- **Root Cause Found:** `InstancePositionTracker` was unconditionally modifying `DrainPlayerFromWorldEvent` to override Hytale's return destination, even when Hytale already had a valid one
+- **The Problem:** This event modification was causing state corruption that persisted even after HyFixes was removed from the server
+- **The Fix:** Now only modifies the event if Hytale's return world is actually null/missing (true fallback behavior)
+
+### Added
+
+#### World.addPlayer() Race Condition Fix (Early Plugin)
+- **Target:** `World.addPlayer(PlayerRef, Transform, Boolean, Boolean)`
+- **Bug:** `IllegalStateException: Player is already in a world` when entering instance portals
+- **Crash location:** `World.addPlayer()` at line 1008
+- **Root cause:** Hytale's async instance teleport code has a race condition where it tries to add player to the new instance world before removing them from their old world
+- **Fix:** Bytecode transformation replaces the exception throw with a warning log and continues gracefully
+- **Previously:** This was attempted with runtime event handlers but couldn't be fixed at plugin level
+
+### Disabled (Runtime Plugin)
+
+#### InstanceTeleportSanitizer
+- **Disabled:** The race condition monitor for instance portals has been disabled in the runtime plugin
+- **Reason:** The fix is now handled properly by bytecode transformation in the early plugin
+- **Note:** If you're only using the runtime plugin without the early plugin, you may still experience instance teleport issues
+
+### Technical Details
+
+**Before (problematic):**
+```java
+// Always overwrote Hytale's return destination
+event.setWorld(returnWorld);
+event.setTransform(savedPos.getTransform());
+```
+
+**After (safe fallback):**
+```java
+// Only intervene if Hytale has no valid return destination
+World existingDestination = event.getWorld();
+if (existingDestination != null) {
+    return; // Don't interfere - Hytale has valid destination
+}
+// Only set our fallback if Hytale's destination is null
+event.setWorld(returnWorld);
+```
+
+---
+
 ## [1.4.0] - 2026-01-17
 
 ### Added

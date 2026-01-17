@@ -183,6 +183,10 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
             for (String line : status.split("\n")) {
                 sendMessage(player, "&7" + line);
             }
+        } else {
+            sendMessage(player, "&6--- Instance Teleport Sanitizer ---");
+            sendMessage(player, "&cDISABLED (v1.4.1) - Hytale race condition unfixable at plugin level");
+            sendMessage(player, "&7See Issue #7 for details");
         }
 
         sendMessage(player, "");

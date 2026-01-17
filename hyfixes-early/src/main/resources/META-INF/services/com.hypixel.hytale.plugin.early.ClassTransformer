@@ -1,1 +1,5 @@
 com.hyfixes.early.InteractionChainTransformer
+com.hyfixes.early.WorldTransformer
+com.hyfixes.early.SpawnReferenceSystemsTransformer
+com.hyfixes.early.BeaconSpawnControllerTransformer
+com.hyfixes.early.BlockComponentChunkTransformer

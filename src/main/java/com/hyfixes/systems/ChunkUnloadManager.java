@@ -113,9 +113,8 @@ public class ChunkUnloadManager {
         );
 
         // If we already discovered instances, pass them now
-        if (chunkStoreInstance != null) {
-            chunkCleanupSystem.setChunkStoreInstance(chunkStoreInstance);
-        }
+        // NOTE: chunkStoreInstance is no longer passed - waitForLoadingChunks() causes
+        // "Store is currently processing!" errors when called from a system tick
         if (chunkLightingInstance != null) {
             chunkCleanupSystem.setChunkLightingInstance(chunkLightingInstance);
         }
@@ -238,14 +237,12 @@ public class ChunkUnloadManager {
                             );
 
                             // Save references and pass to main-thread cleanup system
+                            // NOTE: ChunkStore is no longer passed to cleanup system because
+                            // waitForLoadingChunks() causes "Store is currently processing!" errors
                             if (type.contains("chunkstore") || name.equals("chunkstore")) {
                                 chunkStoreInstance = manager;
-                                if (chunkCleanupSystem != null) {
-                                    chunkCleanupSystem.setChunkStoreInstance(manager);
-                                    plugin.getLogger().at(Level.INFO).log(
-                                        "[ChunkUnloadManager] Passed ChunkStore to main-thread cleanup system"
-                                    );
-                                }
+                                // ChunkStore reference kept for other potential uses, but NOT passed
+                                // to ChunkCleanupSystem anymore
                             }
                             if (type.contains("chunklighting") || name.contains("lighting")) {
                                 chunkLightingInstance = manager;

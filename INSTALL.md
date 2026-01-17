@@ -13,7 +13,7 @@ This bundle contains two plugins that work together to fix bugs in Hytale server
 
 ### Step 1: Runtime Plugin (Required)
 
-1. Copy `hyfixes.jar` to your server's `plugins/` folder
+1. Copy `hyfixes.jar` to your server's `mods/` folder
 2. Restart the server
 
 ### Step 2: Early Plugin (Recommended)
