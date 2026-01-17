@@ -2,6 +2,24 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.4] - 2026-01-17
+
+### Added
+
+#### `/who` Command Fix (PR #2 by GameHugo)
+- **Community Contribution!** Thanks to [@GameHugo](https://github.com/GameHugo) for this fix!
+- Fixes bug where `/who` command showed last joined player as player count instead of actual player list
+- New `WhoCommand.java` implementing the corrected `/who` command
+- Uses `AbstractAsyncCommand` for proper async world iteration
+- Properly validates refs before accessing player data
+- Handles both display names and raw usernames
+
+### Code Quality
+- Removed unused imports from contributed code
+- Replaced `assert` statement with proper null handling for safety
+
+---
+
 ## [1.3.3] - 2026-01-17
 
 ### Fixed

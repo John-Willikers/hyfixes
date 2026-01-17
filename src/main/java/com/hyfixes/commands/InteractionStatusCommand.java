@@ -60,7 +60,7 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
 
         // Header
         sendMessage(player, "&6========================================");
-        sendMessage(player, "&6         HyFixes v1.3.3 Status");
+        sendMessage(player, "&6         HyFixes v1.3.4 Status");
         sendMessage(player, "&6========================================");
         sendMessage(player, "");
 
