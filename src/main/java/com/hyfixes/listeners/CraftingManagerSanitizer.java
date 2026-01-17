@@ -271,15 +271,20 @@ public class CraftingManagerSanitizer extends EntityTickingSystem<EntityStore> {
 
     /**
      * Check if player has a bench window open.
-     * Returns false if we can't determine (safer to assume no window).
+     * Returns TRUE if we can't determine - this is safer because:
+     * - If we return false when a window IS open, we break crafting
+     * - If we return true when no window is open, we just miss clearing a stale ref
+     *   (and Hytale will throw an error, but that's better than breaking ALL crafting)
      */
     private boolean hasBenchWindowOpen(Player player) {
         try {
             // Try to check via WindowManager or PageManager
-            // This is a simplified check - if we can't determine, return false to be safe
             Object windowManager = getPlayerWindowManager(player);
             if (windowManager == null) {
-                return false;
+                // Can't find window manager - assume window IS open to be safe
+                // This means we won't clear the bench, which is better than
+                // accidentally clearing it while player is crafting
+                return true;
             }
 
             // Check if any bench window is open
@@ -296,9 +301,10 @@ public class CraftingManagerSanitizer extends EntityTickingSystem<EntityStore> {
             }
 
         } catch (Exception e) {
-            // If we can't check, assume no window (safer - will clear stale refs)
+            // If we can't check, assume window IS open (safer - don't break crafting)
         }
-        return false;
+        // Default to true - better to miss clearing a stale ref than break crafting
+        return true;
     }
 
     /**

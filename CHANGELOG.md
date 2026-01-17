@@ -2,6 +2,23 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.2] - 2026-01-17
+
+### Fixed
+
+#### Critical Bug Fix
+- **CraftingManagerSanitizer** - Fixed logic that was breaking ALL workbench crafting
+  - Previous behavior: Returned `false` (no window open) when WindowManager couldn't be found
+  - This caused the sanitizer to clear bench references while players were actively crafting
+  - New behavior: Returns `true` (assume window IS open) when WindowManager can't be determined
+  - Better to miss clearing a stale ref than to break all crafting functionality
+
+### Technical Details
+- Changed default return value in `hasBenchWindowOpen()` from `false` to `true`
+- Fail-safe logic: If we can't detect window state, assume player IS using a bench
+
+---
+
 ## [1.3.1] - 2026-01-17
 
 ### Added
