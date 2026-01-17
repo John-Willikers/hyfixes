@@ -1,7 +1,9 @@
 package com.hyfixes.commands;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
+import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
@@ -58,7 +60,7 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
 
         // Header
         sendMessage(player, "&6========================================");
-        sendMessage(player, "&6         HyFixes v1.3.0 Status");
+        sendMessage(player, "&6         HyFixes v1.3.3 Status");
         sendMessage(player, "&6========================================");
         sendMessage(player, "");
 
@@ -109,6 +111,30 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
 
         sendMessage(player, "");
 
+        // CraftingManagerSanitizer status
+        CraftingManagerSanitizer craftingSanitizer = plugin.getCraftingManagerSanitizer();
+        if (craftingSanitizer != null) {
+            sendMessage(player, "&6--- Crafting Manager Sanitizer ---");
+            String status = craftingSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // InteractionManagerSanitizer status (Issue #1)
+        InteractionManagerSanitizer interactionSanitizer = plugin.getInteractionManagerSanitizer();
+        if (interactionSanitizer != null) {
+            sendMessage(player, "&6--- Interaction Manager Sanitizer ---");
+            String status = interactionSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
         // ChunkCleanupSystem status
         ChunkCleanupSystem cleanupSystem = plugin.getChunkCleanupSystem();
         if (cleanupSystem != null) {
@@ -132,8 +158,19 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
         }
 
         sendMessage(player, "");
+
+        // Known unfixable bugs section
+        sendMessage(player, "&6--- Known Unfixable Hytale Bugs ---");
+        sendMessage(player, "&7These require fixes from Hytale developers:");
+        sendMessage(player, "&c  - InteractionChain Sync Buffer Overflow");
+        sendMessage(player, "&c  - Missing Replacement Interactions");
+        sendMessage(player, "&c  - Client/Server Interaction Desync");
+        sendMessage(player, "&7See HYTALE_CORE_BUGS.md for technical details");
+
+        sendMessage(player, "");
         sendMessage(player, "&6========================================");
         sendMessage(player, "&7Tip: Use /chunkstatus for chunk details");
+        sendMessage(player, "&7Docs: github.com/John-Willikers/hyfixes");
         sendMessage(player, "&6========================================");
     }
 

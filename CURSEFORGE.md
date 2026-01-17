@@ -50,6 +50,22 @@ New admin command to view comprehensive HyFixes statistics.
 - **Command:** `/interactionstatus` (aliases: `/hyfixes`, `/hfs`)
 - **Shows:** Crashes prevented by type, memory stats, known unfixable Hytale bugs
 
+### CraftingManager Bench Crash (Critical - v1.3.1)
+When a player opens a processing bench while having a stale bench reference, they get **kicked from the server**.
+- **Error:** `IllegalArgumentException` in `CraftingManager.setBench` - Bench blockType is already set
+- **Fix:** Monitors players each tick and clears stale bench references before crash
+
+### InteractionManager NPE Crash (Critical - v1.3.1)
+When a player opens a crafttable at specific locations, they get **kicked from the server**.
+- **Error:** `NullPointerException` in `InteractionSystems$TickInteractionManagerSystem`
+- **Fix:** Validates interaction chains each tick and removes corrupted ones before crash
+- **GitHub Issue:** [#1](https://github.com/John-Willikers/hyfixes/issues/1)
+
+### Client Timeout Protection (Critical - v1.3.3)
+When an interaction chain waits too long for client data, the player gets **kicked from the server**.
+- **Error:** `RuntimeException: Client took too long to send clientData` at `InteractionChain.java:207`
+- **Fix:** Proactively detects chains waiting too long (>2.5 seconds) and removes them before Hytale kicks the player
+
 ## Installation
 
 1. Download `hyfixes-x.x.x.jar`
@@ -61,6 +77,16 @@ New admin command to view comprehensive HyFixes statistics.
 - Hytale Early Access (2025+)
 - Java 21+
 - Server-side only
+
+## Known Unfixable Bugs
+
+Some Hytale core bugs **cannot be fixed at the plugin level**. We've documented these in detail to help Hytale developers:
+
+- **InteractionChain Sync Buffer Overflow** - Causes combat/food/tool desync (400-2,500 errors/session)
+- **Missing Replacement Interactions** - Missing sound effects and handlers
+- **Client/Server Interaction Desync** - Action validation failures
+
+See [HYTALE_CORE_BUGS.md](https://github.com/John-Willikers/hyfixes/blob/main/HYTALE_CORE_BUGS.md) for full technical analysis.
 
 ## Source Code
 

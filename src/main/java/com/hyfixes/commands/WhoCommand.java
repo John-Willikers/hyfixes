@@ -1,11 +1,9 @@
 package com.hyfixes.commands;
 
-import com.hyfixes.HyFixes;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractAsyncCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -53,9 +51,11 @@ public class WhoCommand extends AbstractAsyncCommand {
                         if (playerComponent != null) {
                             DisplayNameComponent displayNameComponent = store.getComponent(ref, DisplayNameComponent.getComponentType());
 
-                            assert displayNameComponent != null;
+                            // Safely get display name with null checks (fixed from assert)
+                            Message displayName = (displayNameComponent != null)
+                                    ? displayNameComponent.getDisplayName()
+                                    : null;
 
-                            Message displayName = displayNameComponent.getDisplayName();
                             if (displayName != null) {
                                 playerMessages.add(
                                         Message.translation("server.commands.who.playerWithDisplayName")

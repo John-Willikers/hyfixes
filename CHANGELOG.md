@@ -2,6 +2,90 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.3] - 2026-01-17
+
+### Fixed
+
+#### GatherObjectiveTaskSanitizer API Discovery Fix
+- **Fixed incorrect class name lookups** - Sanitizer was searching for classes that don't exist:
+  - Old: `ObjectiveComponent`, `PlayerObjectives`, `ObjectiveManager`
+  - New: `ObjectiveDataStore`, `GatherObjectiveTask`
+- Updated API discovery to use correct Hytale package paths:
+  - `com.hypixel.hytale.builtin.adventure.objectives.ObjectiveDataStore`
+  - `com.hypixel.hytale.builtin.adventure.objectives.task.GatherObjectiveTask`
+- Added field introspection to find tasks collection and target ref fields
+- Enhanced logging to show all discovered methods and fields for debugging
+- Now properly validates tasks within ObjectiveDataStore component
+
+### Added
+
+#### Client Timeout Protection (InteractionManagerSanitizer)
+- **New feature:** Proactively detect and cancel chains waiting too long for client data
+- Prevents player kicks from "Client took too long to send clientData" errors
+- Error: `RuntimeException: Client took too long to send clientData` at `InteractionChain.java:207`
+- Tracks chains in WAITING_FOR_CLIENT_DATA state and removes them after 2500ms (before Hytale's ~3 second kick)
+- Uses reflection to discover CallState enum and chain state field
+- New stat "Timeouts Prevented" shown in `/interactionstatus` command
+
+### Technical Details
+- Discovery now finds component type from ObjectiveDataStore
+- Checks both methods (`getTasks`, `getActiveTasks`) and fields (`tasks`, `activeTasks`)
+- Logs all fields and methods on discovered classes for future debugging
+- Status command now shows detailed discovery results
+- InteractionManagerSanitizer now tracks chain waiting times in ConcurrentHashMap
+- Client timeout threshold set to 2500ms (configurable via constant)
+
+---
+
+## [1.3.2] - 2026-01-17
+
+### Fixed
+
+#### Critical Bug Fix
+- **CraftingManagerSanitizer** - Fixed logic that was breaking ALL workbench crafting
+  - Previous behavior: Returned `false` (no window open) when WindowManager couldn't be found
+  - This caused the sanitizer to clear bench references while players were actively crafting
+  - New behavior: Returns `true` (assume window IS open) when WindowManager can't be determined
+  - Better to miss clearing a stale ref than to break all crafting functionality
+
+### Technical Details
+- Changed default return value in `hasBenchWindowOpen()` from `false` to `true`
+- Fail-safe logic: If we can't detect window state, assume player IS using a bench
+
+---
+
+## [1.3.1] - 2026-01-17
+
+### Added
+
+#### New Bug Fixes
+- **CraftingManagerSanitizer** - Prevents player kick when opening processing benches with stale state
+  - Uses reflection-based API discovery to monitor CraftingManager component on players
+  - Clears stale bench references before `setBench()` can throw IllegalArgumentException
+  - Error: `Bench blockType is already set! Must be cleared (close UI)` at `CraftingManager.java:157`
+
+- **InteractionManagerSanitizer** - Prevents player kick when opening crafttables at specific locations
+  - GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/1
+  - Validates all interaction chains each tick for null context or invalid refs
+  - Removes corrupted chains before `TickInteractionManagerSystem` can crash on them
+  - Error: `NullPointerException` in `InteractionSystems$TickInteractionManagerSystem`
+
+#### Documentation
+- **HYTALE_CORE_BUGS.md** - Comprehensive documentation of Hytale core bugs that cannot be fixed at plugin level
+  - InteractionChain Sync Buffer Overflow (with decompiled bytecode analysis)
+  - Missing Replacement Interactions
+  - Client/Server Interaction Desync
+  - World Task Queue Silent NPE
+  - Includes reproduction steps and suggested fixes for Hytale developers
+
+### Technical Details
+- Total active bug fixes increased from 10 to 12
+- New systems use EntityTickingSystem pattern on Player entities
+- CraftingManagerSanitizer uses runtime reflection for component discovery
+- InteractionManagerSanitizer validates InteractionChain context and refs
+
+---
+
 ## [1.3.0] - 2026-01-16
 
 ### Added
