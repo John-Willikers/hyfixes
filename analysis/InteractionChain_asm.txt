@@ -1,0 +1,2 @@
+Error: Could not find or load main class org.objectweb.asm.util.ASMifier
+Caused by: java.lang.ClassNotFoundException: org.objectweb.asm.util.ASMifier

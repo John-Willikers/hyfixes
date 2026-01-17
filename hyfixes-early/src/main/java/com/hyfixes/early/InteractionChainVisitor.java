@@ -7,12 +7,14 @@ import org.objectweb.asm.Opcodes;
 /**
  * ASM ClassVisitor for InteractionChain.
  *
- * This visitor intercepts the putInteractionSyncData method and applies
- * our fix for the buffer overflow bug.
+ * This visitor intercepts problematic methods and applies fixes:
+ * 1. putInteractionSyncData - buffer overflow when data arrives out of order
+ * 2. updateSyncPosition - throws IllegalArgumentException on sync gaps
  */
 public class InteractionChainVisitor extends ClassVisitor {
 
-    private static final String TARGET_METHOD = "putInteractionSyncData";
+    private static final String PUT_SYNC_DATA_METHOD = "putInteractionSyncData";
+    private static final String UPDATE_SYNC_POSITION_METHOD = "updateSyncPosition";
 
     private String className;
 
@@ -30,12 +32,16 @@ public class InteractionChainVisitor extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
-        if (name.equals(TARGET_METHOD)) {
+        if (name.equals(PUT_SYNC_DATA_METHOD)) {
             System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
             System.out.println("[HyFixes-Early] Applying buffer overflow fix...");
-
-            // Wrap with our custom method visitor that will modify the bytecode
             return new PutSyncDataMethodVisitor(mv, className);
+        }
+
+        if (name.equals(UPDATE_SYNC_POSITION_METHOD)) {
+            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
+            System.out.println("[HyFixes-Early] Applying sync position fix...");
+            return new UpdateSyncPositionMethodVisitor(mv, className);
         }
 
         return mv;
