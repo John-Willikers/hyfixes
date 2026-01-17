@@ -59,8 +59,9 @@ public class InteractionManagerSanitizer extends EntityTickingSystem<EntityStore
     private Method cancelMethod = null;  // InteractionChain.cancel() or similar
     private Object waitingForClientDataState = null;  // CallState.WAITING_FOR_CLIENT_DATA enum value
 
-    // Client timeout threshold - 2500ms (slightly less than Hytale's ~3 second timeout)
-    private static final long CLIENT_TIMEOUT_MS = 2500;
+    // Client timeout threshold - 2000ms (1 full second before Hytale's ~3 second kick)
+    // Lowered from 2500ms in v1.3.6 to catch more timeout issues before player gets kicked
+    private static final long CLIENT_TIMEOUT_MS = 2000;
 
     // Track chains waiting for client data: chainKey -> firstSeenTimestamp
     private final ConcurrentHashMap<String, Long> waitingChains = new ConcurrentHashMap<>();

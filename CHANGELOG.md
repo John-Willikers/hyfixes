@@ -2,6 +2,71 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.8] - 2026-01-17
+
+### Added
+
+#### SpawnMarker Null NPC References Crash Fix (Issue #5)
+- **New `SpawnMarkerReferenceSanitizer`** - Prevents world crash from null `npcReferences` array
+- GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/5
+- Error: `NullPointerException: Cannot read the array length because "<local15>" is null`
+- Crash location: `SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove()` at line 166
+- Uses reflection-based API discovery to find SpawnMarkerEntity components
+- Validates npcReferences array each tick and sets to empty array if null
+- Status visible in `/interactionstatus` command
+
+### Technical Details
+- Queries for `SpawnMarkerEntity` component on spawn marker entities
+- Discovers `getNpcReferences()` and `setNpcReferences()` methods via reflection
+- Creates empty `InvalidatablePersistentRef[]` array when null is detected
+- Prevents crash before `MarkerAddRemoveSystem.onEntityRemove()` can iterate null array
+
+---
+
+## [1.3.7] - 2026-01-17
+
+### Added
+
+#### SpawnBeacon Null Parameter Crash Fix (Issue #4)
+- **New `SpawnBeaconSanitizer`** - Prevents server crash from null `RoleSpawnParameters`
+- GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/4
+- Error: `NullPointerException: Cannot invoke "RoleSpawnParameters.getId()" because "spawn" is null`
+- Crash location: `BeaconSpawnController.createRandomSpawnJob()` at line 110
+- Uses reflection-based API discovery to find spawn beacon components
+- Validates and removes null spawn entries before Hytale's code can crash on them
+- Status visible in `/interactionstatus` command
+
+### Technical Details
+- Queries for `BeaconSpawnController` component on spawn beacon entities
+- Discovers spawns collection via reflection (field or getter method)
+- Removes null entries from List/Collection/Map spawn storage
+- Validates spawn objects by checking if `getId()` returns null
+
+---
+
+## [1.3.6] - 2026-01-17
+
+### Changed
+
+#### More Aggressive Client Timeout Protection
+- **Lowered timeout threshold from 2500ms to 2000ms** in InteractionManagerSanitizer
+- Gives a full 1 second buffer before Hytale's ~3 second kick (was 500ms)
+- Should catch more "Client took too long to send clientData" errors before players get kicked
+- Based on log analysis showing 6 player kicks in a 14-minute session
+
+---
+
+## [1.3.5] - 2026-01-17
+
+### Removed
+
+#### `/tp` Command Override (Fixed by Hytale)
+- **Removed `TeleportCommand.java`** - Hytale team fixed the teleport argument order
+- The original fix was for backwards argument order in Hytale's `/tp` command
+- No longer needed as Hytale's built-in command now works correctly
+
+---
+
 ## [1.3.4] - 2026-01-17
 
 ### Added

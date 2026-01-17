@@ -5,6 +5,8 @@ import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
 import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.PickupItemChunkHandler;
+import com.hyfixes.listeners.SpawnBeaconSanitizer;
+import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
 import com.hyfixes.systems.InteractionChainMonitor;
@@ -60,7 +62,7 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
 
         // Header
         sendMessage(player, "&6========================================");
-        sendMessage(player, "&6         HyFixes v1.3.4 Status");
+        sendMessage(player, "&6         HyFixes v1.3.8 Status");
         sendMessage(player, "&6========================================");
         sendMessage(player, "");
 
@@ -128,6 +130,30 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
         if (interactionSanitizer != null) {
             sendMessage(player, "&6--- Interaction Manager Sanitizer ---");
             String status = interactionSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // SpawnBeaconSanitizer status (Issue #4)
+        SpawnBeaconSanitizer spawnSanitizer = plugin.getSpawnBeaconSanitizer();
+        if (spawnSanitizer != null) {
+            sendMessage(player, "&6--- Spawn Beacon Sanitizer ---");
+            String status = spawnSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // SpawnMarkerReferenceSanitizer status (Issue #5)
+        SpawnMarkerReferenceSanitizer markerSanitizer = plugin.getSpawnMarkerReferenceSanitizer();
+        if (markerSanitizer != null) {
+            sendMessage(player, "&6--- Spawn Marker Reference Sanitizer ---");
+            String status = markerSanitizer.getStatus();
             for (String line : status.split("\n")) {
                 sendMessage(player, "&7" + line);
             }

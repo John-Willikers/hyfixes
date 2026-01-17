@@ -13,6 +13,8 @@ import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
+import com.hyfixes.listeners.SpawnBeaconSanitizer;
+import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
 import com.hyfixes.systems.InteractionChainMonitor;
@@ -40,6 +42,7 @@ import java.util.logging.Level;
  * - InteractionChainMonitor: Tracks unfixable Hytale bugs for reporting (v1.3.0)
  * - CraftingManagerSanitizer: Prevents crash from stale bench references (v1.3.1)
  * - InteractionManagerSanitizer: Prevents NPE crash when opening crafttables (v1.3.1, Issue #1)
+ * - SpawnBeaconSanitizer: Prevents crash from null spawn parameters in BeaconSpawnController (v1.3.7, Issue #4)
  */
 public class HyFixes extends JavaPlugin {
 
@@ -52,6 +55,8 @@ public class HyFixes extends JavaPlugin {
     private InteractionChainMonitor interactionChainMonitor;
     private CraftingManagerSanitizer craftingManagerSanitizer;
     private InteractionManagerSanitizer interactionManagerSanitizer;
+    private SpawnBeaconSanitizer spawnBeaconSanitizer;
+    private SpawnMarkerReferenceSanitizer spawnMarkerReferenceSanitizer;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -142,6 +147,20 @@ public class HyFixes extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(interactionManagerSanitizer);
         getLogger().at(Level.INFO).log("[FIX] InteractionManagerSanitizer registered - prevents crafttable interaction crash");
 
+        // Fix 12: SpawnBeacon null RoleSpawnParameters crash (v1.3.7)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/4
+        // Validates spawn parameters before BeaconSpawnController.createRandomSpawnJob() can crash
+        spawnBeaconSanitizer = new SpawnBeaconSanitizer(this);
+        getEntityStoreRegistry().registerSystem(spawnBeaconSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] SpawnBeaconSanitizer registered - prevents spawn beacon null parameter crash");
+
+        // Fix 13: SpawnMarkerReference null npcReferences crash (v1.3.8)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/5
+        // Prevents world crash when SpawnMarkerEntity has null npcReferences array
+        spawnMarkerReferenceSanitizer = new SpawnMarkerReferenceSanitizer(this);
+        getEntityStoreRegistry().registerSystem(spawnMarkerReferenceSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] SpawnMarkerReferenceSanitizer registered - prevents spawn marker null array crash");
+
         // Register admin commands
         registerCommands();
     }
@@ -151,7 +170,7 @@ public class HyFixes extends JavaPlugin {
         getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
         getCommandRegistry().registerCommand(new InteractionStatusCommand(this));
         getCommandRegistry().registerCommand(new WhoCommand());
-        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus, /chunkunload, /interactionstatus and /who commands");
+        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus, /chunkunload, /interactionstatus, and /who commands");
     }
 
     @Override
@@ -169,7 +188,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 12; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer
+        return 14; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer
     }
 
     public static HyFixes getInstance() {
@@ -223,5 +242,19 @@ public class HyFixes extends JavaPlugin {
      */
     public InteractionManagerSanitizer getInteractionManagerSanitizer() {
         return interactionManagerSanitizer;
+    }
+
+    /**
+     * Get the SpawnBeaconSanitizer for commands and status.
+     */
+    public SpawnBeaconSanitizer getSpawnBeaconSanitizer() {
+        return spawnBeaconSanitizer;
+    }
+
+    /**
+     * Get the SpawnMarkerReferenceSanitizer for commands and status.
+     */
+    public SpawnMarkerReferenceSanitizer getSpawnMarkerReferenceSanitizer() {
+        return spawnMarkerReferenceSanitizer;
     }
 }
