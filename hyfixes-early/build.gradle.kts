@@ -14,13 +14,14 @@ java {
 repositories {
     mavenCentral()
     flatDir {
-        dirs("libs")
+        dirs("../libs")
     }
 }
 
 dependencies {
     // Hytale Server API (for ClassTransformer interface)
-    compileOnly(files("libs/HytaleServer.jar"))
+    // Use parent directory's libs folder (shared with runtime plugin)
+    compileOnly(files("../libs/HytaleServer.jar"))
 
     // ASM for bytecode manipulation
     implementation("org.ow2.asm:asm:9.6")
