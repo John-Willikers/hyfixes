@@ -3,3 +3,4 @@ com.hyfixes.early.WorldTransformer
 com.hyfixes.early.SpawnReferenceSystemsTransformer
 com.hyfixes.early.BeaconSpawnControllerTransformer
 com.hyfixes.early.BlockComponentChunkTransformer
+com.hyfixes.early.SpawnMarkerSystemsTransformer

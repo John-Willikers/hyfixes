@@ -2,6 +2,21 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.4.6] - 2026-01-17
+
+### Added
+
+#### SpawnMarkerSystems Null npcReferences Fix (Early Plugin)
+- **Target:** `SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove()`
+- **Bug:** `NullPointerException: Cannot read the array length because "<local15>" is null`
+- **Crash location:** `SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove()` at line 166
+- **Root cause:** `SpawnMarkerEntity.getNpcReferences()` can return null, but the code tries to iterate over it without checking
+- **Fix:** Bytecode transformation adds null check after `getNpcReferences()` call - returns early if null
+- **Impact:** Replaces runtime SpawnMarkerReferenceSanitizer which was fixing **7,853 entities per session**
+- **Performance:** Much more efficient - only runs on entity removal, not every tick
+
+---
+
 ## [1.4.5] - 2026-01-17
 
 ### Fixed
