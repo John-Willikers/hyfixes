@@ -1,0 +1,91 @@
+name: "\U0001F9EC Early Plugin Bug"
+description: Report a bug caused by HyFixes Early plugin (bytecode transformers)
+labels: ["early-plugin-bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Think you found a bug in HyFixes Early plugin? These are the bytecode transformers that load before the server starts.
+
+        **Common signs of Early plugin issues:**
+        - Server crashes on startup
+        - Errors mentioning `[HyFixes-Early]` or transformer classes
+        - Issues that only happen with `hyfixes-early.jar` in `earlyplugins/`
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What's going wrong? Be as detailed as possible.
+      placeholder: "Server crashes on startup with ClassNotFoundException after installing HyFixes Early..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack Trace / Error Log
+      description: Paste the full error message and stack trace
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: startup-logs
+    attributes:
+      label: Server Startup Logs
+      description: |
+        Paste your FULL startup logs showing transformer loading. We need to see:
+        - `[EarlyPlugin] Found: hyfixes-early.jar`
+        - `[EarlyPlugin] Loading transformer: ...`
+        - `[HyFixes-Early] Transforming ...` messages
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: hyfixes-version
+    attributes:
+      label: HyFixes Early Version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: hytale-version
+    attributes:
+      label: Hytale Version
+      placeholder: "1.0.0-beta"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: without-hyfixes
+    attributes:
+      label: Does this happen WITHOUT HyFixes Early?
+      description: Please test with hyfixes-early.jar removed from earlyplugins/
+      options:
+        - "No - Only happens with HyFixes Early installed"
+        - "Yes - Also happens without HyFixes Early"
+        - "I can't test without HyFixes Early"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: early-plugins-enabled
+    attributes:
+      label: Are early plugins enabled in your config?
+      description: If not enabled, you'll see "Press ENTER to accept and continue..."
+      options:
+        - "Yes - Early plugins are enabled (no ENTER prompt)"
+        - "No - I have to press ENTER each startup"
+        - "I'm not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: java-version
+    attributes:
+      label: Java Version
+      description: Run `java -version` and paste the output
+      render: shell

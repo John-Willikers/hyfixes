@@ -1,0 +1,64 @@
+name: "\U0001F3AE Hytale Bug Report"
+description: Report a bug in Hytale that you'd like HyFixes to fix
+labels: ["hytale-bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a Hytale bug! We'll investigate if HyFixes can patch it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What's happening? Be as detailed as possible.
+      placeholder: "When entering volcanic biomes, the server crashes with a NullPointerException..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack Trace / Error Log
+      description: Paste the full error message and stack trace
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we trigger this bug?
+      placeholder: |
+        1. Start server with default world
+        2. Teleport to volcanic biome
+        3. Wait for spawn beacons to activate
+    validations:
+      required: true
+
+  - type: input
+    id: hytale-version
+    attributes:
+      label: Hytale Version
+      placeholder: "1.0.0-beta"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hyfixes-installed
+    attributes:
+      label: Do you have HyFixes installed?
+      options:
+        - "No - This happens in vanilla Hytale"
+        - "Yes - But this also happens WITHOUT HyFixes"
+        - "Yes - I haven't tested without HyFixes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Server Logs
+      description: Any additional log context (startup logs, surrounding errors, etc.)
+      render: shell

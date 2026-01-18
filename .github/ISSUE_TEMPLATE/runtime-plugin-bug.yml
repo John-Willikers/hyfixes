@@ -1,0 +1,84 @@
+name: "\U0001F41B Runtime Plugin Bug"
+description: Report a bug caused by HyFixes runtime plugin
+labels: ["runtime-bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Think you found a bug in HyFixes runtime plugin? Let us know!
+
+        **Note:** If this bug happens WITHOUT HyFixes installed, please use the "Hytale Bug Report" template instead.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What's going wrong? Be as detailed as possible.
+      placeholder: "After installing HyFixes, players can't interact with NPCs..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack Trace / Error Log
+      description: Paste the full error message and stack trace
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we trigger this bug?
+      placeholder: |
+        1. Install HyFixes plugin
+        2. Start server
+        3. Try to interact with an NPC
+    validations:
+      required: true
+
+  - type: input
+    id: hyfixes-version
+    attributes:
+      label: HyFixes Version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: hytale-version
+    attributes:
+      label: Hytale Version
+      placeholder: "1.0.0-beta"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: without-hyfixes
+    attributes:
+      label: Does this happen WITHOUT HyFixes?
+      description: Please test with HyFixes removed to confirm this is a plugin bug
+      options:
+        - "No - Only happens with HyFixes installed"
+        - "Yes - Also happens without HyFixes (use Hytale Bug template)"
+        - "I can't test without HyFixes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server Startup Logs
+      description: Paste your server startup logs showing HyFixes loading
+      render: shell
+
+  - type: textarea
+    id: other-plugins
+    attributes:
+      label: Other Plugins Installed
+      description: List any other plugins you have installed
+      placeholder: |
+        - SomeOtherPlugin v1.0
+        - AnotherPlugin v2.3

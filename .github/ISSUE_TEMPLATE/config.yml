@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "\U0001F4AC Discord Support"
+    url: https://discord.gg/hytale
+    about: Get help from the community on Discord
+  - name: "\U0001F4D6 Documentation"
+    url: https://github.com/John-Willikers/hyfixes#readme
+    about: Check out the README and installation guide
+  - name: "\U00002753 Question / Discussion"
+    url: https://github.com/John-Willikers/hyfixes/discussions
+    about: Ask questions or start a discussion
