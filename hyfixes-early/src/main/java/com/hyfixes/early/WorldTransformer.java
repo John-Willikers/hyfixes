@@ -15,15 +15,19 @@ import org.objectweb.asm.ClassVisitor;
  * In World.addPlayer(), when a player enters an instance portal, Hytale's async code
  * tries to add them to the new instance world before removing them from their current world.
  * World.addPlayer() checks if playerRef.getReference() is non-null and throws
- * IllegalStateException if so.
+ * IllegalStateException if so. This is a race condition in InstancesPlugin where
+ * removeFromStore() hasn't completed before addPlayer() is called.
  *
  * Error: java.lang.IllegalStateException: Player is already in a world
  * at com.hypixel.hytale.server.core.universe.world.World.addPlayer(World.java:1008)
  *
- * The Fix:
- * Transform addPlayer() to handle the case where a player is still in another world
- * by logging a warning and proceeding gracefully instead of throwing an exception.
- * Hytale's drain logic will eventually clean up the old world reference.
+ * The Fix (Option A - Retry Loop):
+ * Instead of immediately throwing, we inject a retry loop that waits up to 100ms
+ * (20 retries × 5ms each) for the reference to be cleared by the drain operation.
+ * If the reference clears, we log success and continue. If it doesn't clear after
+ * all retries, we throw the original exception (indicating a real problem, not a race).
+ *
+ * This properly handles the race condition while still catching genuine errors.
  *
  * @see <a href="https://github.com/John-Willikers/hyfixes/issues/7">GitHub Issue #7</a>
  */
@@ -46,7 +50,7 @@ public class WorldTransformer implements ClassTransformer {
 
         System.out.println("[HyFixes-Early] ================================================");
         System.out.println("[HyFixes-Early] Transforming World class...");
-        System.out.println("[HyFixes-Early] Fixing addPlayer() race condition bug (Issue #7)");
+        System.out.println("[HyFixes-Early] Fixing addPlayer() race condition with retry loop (Issue #7)");
         System.out.println("[HyFixes-Early] ================================================");
 
         try {

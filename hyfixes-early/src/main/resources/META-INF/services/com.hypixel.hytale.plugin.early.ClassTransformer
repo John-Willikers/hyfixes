@@ -5,3 +5,4 @@ com.hyfixes.early.BeaconSpawnControllerTransformer
 com.hyfixes.early.BlockComponentChunkTransformer
 com.hyfixes.early.SpawnMarkerSystemsTransformer
 com.hyfixes.early.SpawnMarkerEntityTransformer
+com.hyfixes.early.TrackedPlacementTransformer

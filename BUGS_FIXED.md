@@ -457,19 +457,26 @@ Hytale's `InstancesPlugin.teleportPlayerToLoadingInstance()` uses async/Completa
 
 **Impact:** Player is immediately kicked with "Failed to send player to instance world" error.
 
-**The Fix:**
+**The Fix (v1.5.1 - Retry Loop):**
 
-The early plugin transforms `World.addPlayer()` to handle this case gracefully:
+The early plugin transforms `World.addPlayer()` to use a retry loop that waits for the drain operation to complete:
 
 ```java
-// Fixed - log warning and continue instead of throwing
+// Fixed - retry loop waits for race condition to resolve
 if (playerRef.getReference() != null) {
-    System.out.println("[HyFixes-Early] Warning: Player still in world, proceeding anyway");
-    // Continue - Hytale's drain logic will clean up the old reference
+    // Wait up to 100ms (20 retries × 5ms) for drain to complete
+    for (int i = 0; i < 20 && playerRef.getReference() != null; i++) {
+        Thread.sleep(5);
+    }
+    if (playerRef.getReference() != null) {
+        // Still set after 100ms - this is a real error, not a race condition
+        throw new IllegalStateException("Player is already in a world");
+    }
+    System.out.println("[HyFixes-Early] Race condition RESOLVED after " + i + " retries");
 }
 ```
 
-The bytecode transformation intercepts the `ATHROW` instruction for the "Player is already in a world" exception and replaces it with a warning log and continues execution.
+The bytecode transformation intercepts the `ATHROW` instruction for the "Player is already in a world" exception and replaces it with a retry loop. This gives the async drain operation time to complete (up to 100ms) while still catching genuine errors where a player truly shouldn't be added to a world.
 
 ---
 
@@ -673,6 +680,76 @@ The constructor fix is **massively more efficient** - it runs once when the enti
 
 ---
 
+### 17. Teleporter BlockCounter Not Decrementing (v1.6.0)
+
+**Severity:** Medium - Teleporter limit stuck, but manual workaround exists
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/11
+
+When teleporters are deleted, the `BlockCounter` placement count is not decremented, causing players to permanently hit the 5 teleporter limit even after deleting all their teleporters.
+
+The root cause is in `TrackedPlacement$OnAddRemove.onEntityRemove()`:
+
+```java
+public void onEntityRemove(Ref ref, RemoveReason reason, Store store, CommandBuffer commandBuffer) {
+    if (reason != RemoveReason.REMOVE) return;
+    TrackedPlacement tracked = commandBuffer.getComponent(ref, COMPONENT_TYPE);
+    assert (tracked != null);  // CAN FAIL - component may already be removed!
+    BlockCounter counter = commandBuffer.getResource(BLOCK_COUNTER_RESOURCE_TYPE);
+    counter.untrackBlock(tracked.blockName);  // NPE if tracked is null
+}
+```
+
+The code assumes `TrackedPlacement` component is always present when `onEntityRemove` is called, but due to component removal ordering, it may already be null.
+
+**Impact:**
+- Players cannot place new teleporters after reaching the 5 limit
+- Deleting teleporters doesn't restore the limit
+- The warp data in `warps.json` is correctly removed, but `BlockCounter` stays stuck
+
+**The Fix (Early Plugin):**
+
+`TrackedPlacementTransformer` replaces the `onEntityRemove` method with a null-safe version:
+
+```java
+public void onEntityRemove(...) {
+    if (reason != RemoveReason.REMOVE) return;
+
+    TrackedPlacement tracked = commandBuffer.getComponent(ref, COMPONENT_TYPE);
+    if (tracked == null) {
+        System.out.println("[HyFixes-Early] WARNING: TrackedPlacement null on remove");
+        return;  // Gracefully handle null
+    }
+
+    String blockName = tracked.blockName;
+    if (blockName == null || blockName.isEmpty()) {
+        System.out.println("[HyFixes-Early] WARNING: blockName null/empty on remove");
+        return;  // Gracefully handle null/empty
+    }
+
+    BlockCounter counter = commandBuffer.getResource(BLOCK_COUNTER_RESOURCE_TYPE);
+    counter.untrackBlock(blockName);
+    System.out.println("[HyFixes-Early] BlockCounter decremented for: " + blockName);
+}
+```
+
+**The Fix (Runtime Plugin):**
+
+`/fixcounter` admin command allows manual correction of BlockCounter values:
+
+```
+/fixcounter              - Show current teleporter count
+/fixcounter list         - List all tracked block counts
+/fixcounter reset        - Reset teleporter count to 0
+/fixcounter set <value>  - Set teleporter count to specific value
+/fixcounter <block> reset       - Reset specific block type
+/fixcounter <block> set <value> - Set specific block type count
+```
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -693,6 +770,7 @@ The constructor fix is **massively more efficient** - it runs once when the enti
 | InteractionManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates interaction chains |
 | SpawnMarkerReferenceSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | **DEPRECATED** - Now fixed via SpawnMarkerEntityTransformer in early plugin |
 | ChunkTrackerSanitizer | `RefSystem<EntityStore>` | EntityStoreRegistry | Validates PlayerRef on chunk operations |
+| FixCounterCommand | `AbstractPlayerCommand` | CommandRegistry | Admin command to reset/view BlockCounter values |
 
 ### Early Plugin Transformers
 
@@ -706,6 +784,7 @@ The constructor fix is **massively more efficient** - it runs once when the enti
 | BlockComponentChunkTransformer | `BlockComponentChunk` | `addEntityReference` | Exception throw replaced with warning log |
 | MarkerAddRemoveSystemTransformer | `SpawnReferenceSystems$MarkerAddRemoveSystem` | `onEntityRemove` | Null check injection after `getNpcReferences()` |
 | SpawnMarkerEntityTransformer | `SpawnMarkerEntity` | `<init>` (constructor) | Field initialization for `npcReferences` (ROOT CAUSE FIX) |
+| TrackedPlacementTransformer | `TrackedPlacement$OnAddRemove` | `onEntityRemove` | Full method replacement with null-safe version |
 
 ---
 

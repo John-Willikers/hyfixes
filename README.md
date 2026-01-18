@@ -62,12 +62,13 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 |-----|----------|--------------|
 | Sync Buffer Overflow | Critical | Combat/food/tool desync, 400-2500 errors/session |
 | Sync Position Gap | Critical | Player kicked with "out of order" exception |
-| Instance Portal Race | Critical | Player kicked when entering instance portals |
+| Instance Portal Race | Critical | Player kicked when entering instance portals (retry loop fix) |
 | Null SpawnController | Critical | World crashes when spawn beacons load |
 | Null Spawn Parameters | Critical | World crashes in volcanic/cave biomes |
 | Duplicate Block Components | Critical | Player kicked when using teleporters |
 | Null npcReferences (Removal) | Critical | World crashes when spawn markers are removed |
 | Null npcReferences (Constructor) | Critical | ROOT CAUSE: SpawnMarkerEntity never initializes array |
+| BlockCounter Not Decrementing | Medium | Teleporter limit stuck at 5, can't place new ones |
 
 ---
 

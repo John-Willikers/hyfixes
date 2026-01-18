@@ -2,6 +2,55 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.6.0] - 2026-01-18
+
+### Added
+
+#### Teleporter Limit Fix - BlockCounter Null-Safe Decrement (Early Plugin)
+- **Target:** `TrackedPlacement$OnAddRemove.onEntityRemove()`
+- **Bug:** BlockCounter not decremented when teleporters are deleted, causing players to hit the 5 teleporter limit permanently
+- **GitHub Issue:** [#11](https://github.com/John-Willikers/hyfixes/issues/11)
+- **Root Cause:** Original code assumes `TrackedPlacement` component is always non-null on entity removal
+- **Fix:** Bytecode transformation adds null checks:
+  - If `TrackedPlacement` component is null: logs warning, returns early
+  - If `blockName` is null/empty: logs warning, returns early
+  - On success: logs the block type that was decremented
+- **Impact:** Teleporters can now be deleted and replaced properly
+
+#### /fixcounter Admin Command (Runtime Plugin)
+- **Command:** `/fixcounter` (aliases: `/fc`, `/blockcounter`, `/teleporterlimit`)
+- **Purpose:** Manually fix BlockCounter values that got out of sync
+- **Usage:**
+  - `/fixcounter` - Show current teleporter count
+  - `/fixcounter list` - List all tracked block counts in current world
+  - `/fixcounter reset` - Reset teleporter count to 0
+  - `/fixcounter set <value>` - Set teleporter count to specific value
+  - `/fixcounter <block> reset` - Reset specific block type
+  - `/fixcounter <block> set <value>` - Set specific block type count
+- **Note:** Changes persist until server restart or chunk reload
+
+---
+
+## [1.5.1] - 2026-01-18
+
+### Changed
+
+#### World.addPlayer() Retry Loop Fix (Early Plugin)
+- **Target:** `World.addPlayer()` method
+- **Bug:** `IllegalStateException: Player is already in a world` when entering instance portals
+- **GitHub Issue:** [#7](https://github.com/John-Willikers/hyfixes/issues/7)
+- **Previous Fix (v1.4.1):** Simply logged warning and continued, bypassing the check entirely
+- **New Fix (v1.5.1):** Implements a proper retry loop that:
+  - Waits up to 100ms (20 retries × 5ms) for the drain operation to complete
+  - If reference clears, logs success with retry count and continues normally
+  - If reference doesn't clear after 100ms, throws the original exception
+- **Why Better:** Properly handles the race condition while still catching genuine errors where a player shouldn't be added to a world
+- **Logs:**
+  - On success: `[HyFixes-Early] Race condition RESOLVED after X retries (Xms wait)`
+  - On failure: `[HyFixes-Early] Retry failed - player still in world after 100ms, throwing exception`
+
+---
+
 ## [1.5.0] - 2026-01-18
 
 ### Changed
