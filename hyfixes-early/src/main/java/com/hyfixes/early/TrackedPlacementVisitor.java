@@ -105,12 +105,12 @@ public class TrackedPlacementVisitor extends ClassVisitor {
                 "COMPONENT_TYPE",
                 "Lcom/hypixel/hytale/component/ComponentType;");
 
-            // Call getComponent
-            target.visitMethodInsn(Opcodes.INVOKEINTERFACE,
+            // Call getComponent (CommandBuffer is a class, not interface!)
+            target.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
                 "com/hypixel/hytale/component/CommandBuffer",
                 "getComponent",
                 "(Lcom/hypixel/hytale/component/Ref;Lcom/hypixel/hytale/component/ComponentType;)Lcom/hypixel/hytale/component/Component;",
-                true);
+                false);
 
             // Cast to TrackedPlacement
             target.visitTypeInsn(Opcodes.CHECKCAST,
@@ -160,12 +160,12 @@ public class TrackedPlacementVisitor extends ClassVisitor {
                 "BLOCK_COUNTER_RESOURCE_TYPE",
                 "Lcom/hypixel/hytale/component/ResourceType;");
 
-            // Call getResource
-            target.visitMethodInsn(Opcodes.INVOKEINTERFACE,
+            // Call getResource (CommandBuffer is a class, not interface!)
+            target.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
                 "com/hypixel/hytale/component/CommandBuffer",
                 "getResource",
                 "(Lcom/hypixel/hytale/component/ResourceType;)Lcom/hypixel/hytale/component/Resource;",
-                true);
+                false);
 
             // Cast to BlockCounter
             target.visitTypeInsn(Opcodes.CHECKCAST,
