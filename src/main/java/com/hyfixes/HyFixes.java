@@ -3,6 +3,7 @@ package com.hyfixes;
 import com.hyfixes.commands.ChunkStatusCommand;
 import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.commands.CleanInteractionsCommand;
+import com.hyfixes.commands.CleanWarpsCommand;
 import com.hyfixes.commands.FixCounterCommand;
 import com.hyfixes.commands.InteractionStatusCommand;
 import com.hyfixes.commands.WhoCommand;
@@ -192,6 +193,7 @@ public class HyFixes extends JavaPlugin {
         getCommandRegistry().registerCommand(new ChunkStatusCommand(this));
         getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
         getCommandRegistry().registerCommand(new CleanInteractionsCommand(this));
+        getCommandRegistry().registerCommand(new CleanWarpsCommand(this));
         getCommandRegistry().registerCommand(new FixCounterCommand(this));
         getCommandRegistry().registerCommand(new InteractionStatusCommand(this));
         getCommandRegistry().registerCommand(new WhoCommand());
