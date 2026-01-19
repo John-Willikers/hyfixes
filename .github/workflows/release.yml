@@ -66,6 +66,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          RELEASE_VERSION: ${{ env.VERSION }}
         run: |
           chmod +x .github/scripts/generate-changelog.sh
           CHANGELOG=$(.github/scripts/generate-changelog.sh)

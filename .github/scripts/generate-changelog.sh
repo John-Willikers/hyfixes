@@ -48,8 +48,21 @@ MODEL="${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}"
 PAYLOAD_FILE=$(mktemp)
 trap "rm -f $PAYLOAD_FILE" EXIT
 
-# Build the prompt
-PROMPT="Generate a changelog for a Hytale server plugin release called HyFixes. Format as markdown with sections for Features, Fixes, and Changes as needed. Be concise and user-friendly. Focus on what changed, not commit hashes. If there are no commits in a category, omit that section. Here are the commits since last release:
+# Build the prompt - include version info for context
+RELEASE_VER="${RELEASE_VERSION:-UNKNOWN}"
+PREV_VER="${LAST_TAG:-initial}"
+
+PROMPT="Generate a changelog for HyFixes v${RELEASE_VER} (a Hytale server plugin).
+
+Rules:
+- Do NOT include a title/header with version number (that's handled separately)
+- Start directly with the changes grouped by category
+- Use sections: ## Features, ## Fixes, ## Changes (only include sections that have items)
+- Be concise and user-friendly
+- Focus on what changed from the user's perspective, not commit hashes
+- If changes span multiple previous versions, group them by version with ### v1.X.X subheaders
+
+Changes since ${PREV_VER}:
 
 $COMMITS"
 
