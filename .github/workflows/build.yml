@@ -1,11 +1,13 @@
-name: Build and Release
+name: Build
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
+
+env:
+  HYTALE_SERVER_URL: ${{ secrets.HYTALE_SERVER_URL }}
 
 jobs:
   build:
@@ -22,194 +24,30 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Verify HytaleServer.jar exists
+      - name: Download HytaleServer.jar
         run: |
-          if [ ! -f libs/HytaleServer.jar ]; then
-            echo "ERROR: libs/HytaleServer.jar not found!"
+          mkdir -p libs
+          if [ -n "$HYTALE_SERVER_URL" ]; then
+            curl -L -o libs/HytaleServer.jar "$HYTALE_SERVER_URL"
+          else
+            echo "::warning::HYTALE_SERVER_URL secret not set"
             exit 1
           fi
-          echo "Found HytaleServer.jar ($(du -h libs/HytaleServer.jar | cut -f1))"
 
-      - name: Get version from tag or default
-        id: version
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            VERSION="v1.0.0-dev"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+      - name: Build Runtime Plugin (dev)
+        run: ./gradlew build -Pversion=dev
 
-      # Build Runtime Plugin
-      - name: Build Runtime Plugin
-        run: ./gradlew build -Pversion=${{ steps.version.outputs.VERSION }}
+      - name: Build Early Plugin (dev)
+        run: ./gradlew :hyfixes-early:build -Pversion=dev
 
-      - name: Copy Runtime Plugin JAR
-        run: |
-          mkdir -p dist
-          # Find the built JAR (handles versioned names like hyfixes-1.4.0.jar)
-          JAR_FILE=$(find build/libs -name "hyfixes*.jar" -type f | head -1)
-          echo "Found JAR: $JAR_FILE"
-          cp "$JAR_FILE" dist/hyfixes.jar
-          echo "Runtime plugin: $(ls -la dist/hyfixes.jar)"
-
-      # Build Early Plugin
-      - name: Build Early Plugin
-        run: |
-          cd hyfixes-early
-          ./gradlew build
-
-      - name: Copy Early Plugin JAR
-        run: |
-          # Find the built JAR (handles versioned names)
-          JAR_FILE=$(find hyfixes-early/build/libs -name "hyfixes-early*.jar" -type f | head -1)
-          echo "Found JAR: $JAR_FILE"
-          cp "$JAR_FILE" dist/hyfixes-early.jar
-          echo "Early plugin: $(ls -la dist/hyfixes-early.jar)"
-
-      # Create Bundle ZIP
-      - name: Create Bundle ZIP
-        run: |
-          mkdir -p bundle
-          cp dist/hyfixes.jar bundle/
-          cp dist/hyfixes-early.jar bundle/
-          cp INSTALL.md bundle/README.txt
-          cd bundle
-          zip -r ../dist/hyfixes-bundle-${{ steps.version.outputs.VERSION }}.zip .
-          echo "Bundle created: $(ls -la ../dist/hyfixes-bundle-*.zip)"
-
-      # Upload Individual Artifacts
       - name: Upload Runtime Plugin
         uses: actions/upload-artifact@v4
         with:
-          name: hyfixes-runtime
-          path: dist/hyfixes.jar
+          name: hyfixes-dev
+          path: build/libs/*.jar
 
       - name: Upload Early Plugin
         uses: actions/upload-artifact@v4
         with:
-          name: hyfixes-early
-          path: dist/hyfixes-early.jar
-
-      - name: Upload Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: hyfixes-bundle
-          path: dist/hyfixes-bundle-*.zip
-
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: version
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Download Runtime Plugin
-        uses: actions/download-artifact@v4
-        with:
-          name: hyfixes-runtime
-          path: ./release
-
-      - name: Download Early Plugin
-        uses: actions/download-artifact@v4
-        with:
-          name: hyfixes-early
-          path: ./release
-
-      - name: Download Bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: hyfixes-bundle
-          path: ./release
-
-      - name: List release files
-        run: ls -la ./release/
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            ./release/hyfixes.jar
-            ./release/hyfixes-early.jar
-            ./release/hyfixes-bundle-*.zip
-          body: |
-            ## HyFixes ${{ steps.version.outputs.VERSION }}
-
-            ### Downloads
-
-            | File | Description |
-            |------|-------------|
-            | `hyfixes.jar` | Runtime plugin - place in `mods/` folder |
-            | `hyfixes-early.jar` | Early plugin - place in `earlyplugins/` folder |
-            | `hyfixes-bundle-*.zip` | Both plugins + installation instructions |
-
-            ### Installation
-
-            **Runtime Plugin (Required):**
-            1. Download `hyfixes.jar`
-            2. Place in your server's `mods/` folder
-            3. Restart the server
-
-            **Early Plugin (Recommended):**
-            1. Download `hyfixes-early.jar`
-            2. Place in your server's `earlyplugins/` folder
-            3. Set `ACCEPT_EARLY_PLUGINS=1` or press Enter at startup warning
-
-            ### Support
-
-            - **Discord:** https://discord.gg/u5R7kuuGXU
-            - **Issues:** https://github.com/John-Willikers/hyfixes/issues
-          generate_release_notes: true
-
-      - name: Send Discord Notification
-        if: success()
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d '{
-              "embeds": [{
-                "title": "🎉 HyFixes ${{ steps.version.outputs.VERSION }} Released!",
-                "description": "A new version of HyFixes is now available for download.",
-                "color": 5814783,
-                "fields": [
-                  {
-                    "name": "📦 Downloads",
-                    "value": "[**hyfixes.jar**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes.jar) - Runtime Plugin\n[**hyfixes-early.jar**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes-early.jar) - Early Plugin\n[**Bundle ZIP**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes-bundle-${{ steps.version.outputs.VERSION }}.zip) - Both + Instructions",
-                    "inline": false
-                  },
-                  {
-                    "name": "🛡️ Runtime Plugin Fixes",
-                    "value": "• Pickup item crashes\n• Respawn block crashes\n• Processing bench crashes\n• Instance exit crashes\n• Chunk memory bloat\n• Crafting manager crashes\n• Interaction manager crashes",
-                    "inline": true
-                  },
-                  {
-                    "name": "⚡ Early Plugin Fixes",
-                    "value": "• Sync buffer overflow\n• Sync position gaps\n• Combat/food/tool desync",
-                    "inline": true
-                  },
-                  {
-                    "name": "📥 Installation",
-                    "value": "**Runtime:** `mods/hyfixes.jar`\n**Early:** `earlyplugins/hyfixes-early.jar`",
-                    "inline": false
-                  }
-                ],
-                "footer": {
-                  "text": "HyFixes - Bug fixes for Hytale servers"
-                },
-                "url": "https://github.com/John-Willikers/hyfixes/releases/tag/${{ steps.version.outputs.VERSION }}",
-                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-              }]
-            }' \
-            "$DISCORD_WEBHOOK"
+          name: hyfixes-early-dev
+          path: hyfixes-early/build/libs/*.jar

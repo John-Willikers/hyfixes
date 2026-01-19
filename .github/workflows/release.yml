@@ -1,130 +1,141 @@
-name: Build and Release
+name: Release
 
 on:
   push:
-    tags:
-      - 'v*'  # Triggers on version tags like v1.0.0, v1.6.0, etc.
+    tags: ['v*']
+
+env:
+  HYTALE_SERVER_URL: ${{ secrets.HYTALE_SERVER_URL }}
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for changelog generation
 
-      - name: Set up Java 21
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Remove 'v' prefix from tag for version number
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_VERSION=$GITHUB_REF_NAME" >> $GITHUB_ENV
+          echo "Building version: $VERSION (tag: $GITHUB_REF_NAME)"
+
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          # Remove 'v' prefix from tag
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Building version: ${VERSION}"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Download HytaleServer.jar
-        env:
-          HYTALE_SERVER_URL: ${{ secrets.HYTALE_SERVER_URL }}
         run: |
           mkdir -p libs
           if [ -n "$HYTALE_SERVER_URL" ]; then
             curl -L -o libs/HytaleServer.jar "$HYTALE_SERVER_URL"
           else
-            echo "::warning::HYTALE_SERVER_URL secret not set, using cached jar if available"
+            echo "::error::HYTALE_SERVER_URL secret not set"
+            exit 1
           fi
 
       - name: Update manifest versions
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-
           # Update runtime plugin manifest
-          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"${VERSION}\"/" src/main/resources/manifest.json
+          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"$VERSION\"/" src/main/resources/manifest.json
 
           # Update early plugin manifest
-          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"${VERSION}\"/" hyfixes-early/src/main/resources/manifest.json
+          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"$VERSION\"/" hyfixes-early/src/main/resources/manifest.json
 
           # Update bundle manifest
-          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"${VERSION}\"/" bundle/manifest.json
+          sed -i "s/\"Version\": \"[^\"]*\"/\"Version\": \"$VERSION\"/" bundle/manifest.json
 
-          echo "Updated all manifests to version ${VERSION}"
+          echo "Updated all manifests to version $VERSION"
 
-      - name: Build runtime plugin
-        run: ./gradlew build -Pversion=${{ steps.version.outputs.version }}
+      - name: Build Runtime Plugin
+        run: ./gradlew build -Pversion=${{ env.TAG_VERSION }}
 
-      - name: Build early plugin
+      - name: Build Early Plugin
+        run: ./gradlew :hyfixes-early:build -Pversion=${{ env.TAG_VERSION }}
+
+      - name: Generate changelog with Claude
+        id: changelog
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          cd hyfixes-early
-          ./gradlew build -Pversion=${{ steps.version.outputs.version }}
+          chmod +x .github/scripts/generate-changelog.sh
+          CHANGELOG=$(.github/scripts/generate-changelog.sh)
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create bundle and versioned artifacts
+      - name: Create versioned artifacts and bundle
         run: |
-          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p dist
 
-          # Create versioned JAR copies for release download
-          cp build/libs/hyfixes.jar "hyfixes-${VERSION}.jar"
-          cp hyfixes-early/build/libs/hyfixes-early.jar "hyfixes-early-${VERSION}.jar"
+          # Copy JARs with versioned names
+          cp build/libs/hyfixes-*.jar "dist/hyfixes-${VERSION}.jar" 2>/dev/null || \
+            cp build/libs/hyfixes.jar "dist/hyfixes-${VERSION}.jar"
 
-          # Prepare bundle directories
-          mkdir -p bundle/mods bundle/earlyplugins
+          cp hyfixes-early/build/libs/hyfixes-early-*.jar "dist/hyfixes-early-${VERSION}.jar" 2>/dev/null || \
+            cp hyfixes-early/build/libs/hyfixes-early.jar "dist/hyfixes-early-${VERSION}.jar"
 
-          # Copy built JARs with versioned names to bundle
-          cp "hyfixes-${VERSION}.jar" "bundle/mods/"
-          cp "hyfixes-early-${VERSION}.jar" "bundle/earlyplugins/"
-
-          # Copy README
-          cp CURSEFORGE.md bundle/README.md
+          # Prepare bundle structure
+          mkdir -p dist/bundle/mods dist/bundle/earlyplugins
+          cp "dist/hyfixes-${VERSION}.jar" dist/bundle/mods/
+          cp "dist/hyfixes-early-${VERSION}.jar" dist/bundle/earlyplugins/
+          cp bundle/manifest.json dist/bundle/
+          cp CURSEFORGE.md dist/bundle/README.md 2>/dev/null || echo "No CURSEFORGE.md found"
 
           # Create bundle ZIP
-          cd bundle
-          zip -r "../hyfixes-bundle-${VERSION}.zip" manifest.json mods/ earlyplugins/ README.md
+          cd dist/bundle
+          zip -r "../hyfixes-bundle-v${VERSION}.zip" .
+          cd ../..
 
-      - name: Verify versions
+          echo "=== Created artifacts ==="
+          ls -la dist/
+
+      - name: Verify versions in JARs
         run: |
-          VERSION=${{ steps.version.outputs.version }}
           echo "=== Version Verification ==="
-          echo "Tag version: ${VERSION}"
-          echo "Runtime manifest: $(unzip -p build/libs/hyfixes.jar manifest.json | grep -o '"Version": "[^"]*"')"
-          echo "Early manifest: $(unzip -p hyfixes-early/build/libs/hyfixes-early.jar manifest.json | grep -o '"Version": "[^"]*"')"
-          echo "Bundle manifest: $(grep -o '"Version": "[^"]*"' bundle/manifest.json)"
+          echo "Tag version: $VERSION"
+          echo "Runtime manifest: $(unzip -p dist/hyfixes-${VERSION}.jar manifest.json | grep -o '"Version": "[^"]*"')"
+          echo "Early manifest: $(unzip -p dist/hyfixes-early-${VERSION}.jar manifest.json | grep -o '"Version": "[^"]*"')"
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: HyFixes v${{ steps.version.outputs.version }}
-          body: |
-            ## HyFixes v${{ steps.version.outputs.version }}
-
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-
-            ### Downloads
-
-            | File | Description |
-            |------|-------------|
-            | `hyfixes-${{ steps.version.outputs.version }}.jar` | Runtime plugin - Place in `mods/` |
-            | `hyfixes-early-${{ steps.version.outputs.version }}.jar` | Early plugin - Place in `earlyplugins/` |
-            | `hyfixes-bundle-${{ steps.version.outputs.version }}.zip` | Complete bundle for CurseForge |
-
-            ### Installation
-
-            1. Download both JAR files
-            2. Place `hyfixes-*.jar` in your server's `mods/` directory
-            3. Place `hyfixes-early-*.jar` in your server's `earlyplugins/` directory
-            4. Start the server with `ACCEPT_EARLY_PLUGINS=1` or press Enter when prompted
-
-            **Need help?** Join our [Discord](https://discord.gg/r6KzU4n7V8)
+          name: HyFixes v${{ env.VERSION }}
+          body: ${{ steps.changelog.outputs.content }}
           files: |
-            hyfixes-${{ steps.version.outputs.version }}.jar
-            hyfixes-early-${{ steps.version.outputs.version }}.jar
-            hyfixes-bundle-${{ steps.version.outputs.version }}.zip
+            dist/hyfixes-${{ env.VERSION }}.jar
+            dist/hyfixes-early-${{ env.VERSION }}.jar
+            dist/hyfixes-bundle-v${{ env.VERSION }}.zip
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to CurseForge
+        if: ${{ secrets.CURSEFORGE_TOKEN != '' && secrets.CURSEFORGE_PROJECT_ID != '' }}
+        uses: itsmeow/curseforge-upload@v3
+        with:
+          token: ${{ secrets.CURSEFORGE_TOKEN }}
+          project_id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          game_endpoint: hytale
+          file_path: dist/hyfixes-bundle-v${{ env.VERSION }}.zip
+          display_name: "HyFixes v${{ env.VERSION }}"
+          changelog: ${{ steps.changelog.outputs.content }}
+          changelog_type: markdown
+          release_type: release
 
       - name: Send Discord notification
         if: success()
@@ -132,8 +143,28 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
-            VERSION=${{ steps.version.outputs.version }}
+            # Escape changelog for JSON
+            CHANGELOG_ESCAPED=$(echo '${{ steps.changelog.outputs.content }}' | head -c 500 | jq -Rs .)
+
             curl -H "Content-Type: application/json" \
-              -d "{\"content\": \"🎉 **HyFixes v${VERSION}** has been released!\\n\\nDownload: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}\"}" \
+              -X POST \
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"HyFixes v${VERSION} Released!\",
+                  \"description\": \"A new version of HyFixes is now available.\",
+                  \"color\": 5814783,
+                  \"fields\": [
+                    {
+                      \"name\": \"Downloads\",
+                      \"value\": \"[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION})\",
+                      \"inline\": false
+                    }
+                  ],
+                  \"footer\": {
+                    \"text\": \"HyFixes - Bug fixes for Hytale servers\"
+                  },
+                  \"url\": \"https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION}\"
+                }]
+              }" \
               "$DISCORD_WEBHOOK"
           fi
