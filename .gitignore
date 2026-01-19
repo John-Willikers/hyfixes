@@ -28,3 +28,4 @@ Thumbs.db
 .hytale-downloader-credentials.json
 temp_decompile/
 *.zip
+bin/

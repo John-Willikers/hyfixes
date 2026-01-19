@@ -1,7 +1,7 @@
 {
   "Group": "com.hyfixes",
   "Name": "HyFixes-Early",
-  "Version": "1.6.1",
+  "Version": "1.7.0",
   "Description": "Bytecode transformers for HyFixes - Fixes deep networking bugs and combat desync issues.",
   "Main": "com.hyfixes.early.HyFixesEarly",
   "Authors": [

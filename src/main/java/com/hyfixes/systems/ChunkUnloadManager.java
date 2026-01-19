@@ -1,6 +1,7 @@
 package com.hyfixes.systems;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.config.ConfigManager;
 import com.hyfixes.util.ReflectionHelper;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -46,8 +47,10 @@ public class ChunkUnloadManager {
     private final AtomicInteger methodsCalled = new AtomicInteger(0);
     private final AtomicLong lastRunTime = new AtomicLong(0);
 
-    // Configuration
-    private static final int CHECK_INTERVAL_SECONDS = 30;
+    // Configuration (loaded from ConfigManager)
+    private final int checkIntervalSeconds;
+    private final int initialDelaySeconds;
+    private final int gcEveryNAttempts;
 
     // State
     private ScheduledFuture<?> scheduledTask;
@@ -80,6 +83,12 @@ public class ChunkUnloadManager {
             t.setDaemon(true);
             return t;
         });
+
+        // Load configuration
+        ConfigManager config = ConfigManager.getInstance();
+        this.checkIntervalSeconds = config.getChunkUnloadIntervalSeconds();
+        this.initialDelaySeconds = config.getChunkUnloadInitialDelaySeconds();
+        this.gcEveryNAttempts = config.getChunkUnloadGcEveryNAttempts();
     }
 
     /**
@@ -92,13 +101,13 @@ public class ChunkUnloadManager {
 
         scheduledTask = scheduler.scheduleAtFixedRate(
             this::runChunkCleanup,
-            10, // Initial delay (seconds)
-            CHECK_INTERVAL_SECONDS,
+            initialDelaySeconds,
+            checkIntervalSeconds,
             TimeUnit.SECONDS
         );
 
         plugin.getLogger().at(Level.INFO).log(
-            "[ChunkUnloadManager] Scheduled chunk cleanup every " + CHECK_INTERVAL_SECONDS + " seconds"
+            "[ChunkUnloadManager] Scheduled chunk cleanup every " + checkIntervalSeconds + " seconds (initial delay: " + initialDelaySeconds + "s)"
         );
     }
 
@@ -493,7 +502,7 @@ public class ChunkUnloadManager {
         }
 
         // Strategy 3: Force GC more aggressively
-        if (totalUnloadAttempts.get() % 5 == 0) {
+        if (totalUnloadAttempts.get() % gcEveryNAttempts == 0) {
             System.gc();
             System.runFinalization();
             System.gc();

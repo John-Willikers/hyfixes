@@ -1,5 +1,6 @@
 package com.hyfixes.early;
 
+import com.hyfixes.early.config.EarlyConfigManager;
 import com.hypixel.hytale.plugin.early.ClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -43,6 +44,12 @@ public class ArchetypeChunkTransformer implements ClassTransformer {
     public byte[] transform(String className, String packageName, byte[] classBytes) {
         // Only transform the ArchetypeChunk class
         if (!className.equals(TARGET_CLASS)) {
+            return classBytes;
+        }
+
+        // Check if transformer is enabled via config
+        if (!EarlyConfigManager.getInstance().isTransformerEnabled("archetypeChunk")) {
+            System.out.println("[HyFixes-Early] ArchetypeChunkTransformer DISABLED by config");
             return classBytes;
         }
 

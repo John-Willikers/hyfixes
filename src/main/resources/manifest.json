@@ -1,7 +1,7 @@
 {
   "Group": "com.hyfixes",
   "Name": "HyFixes",
-  "Version": "1.6.2",
+  "Version": "1.7.0",
   "Description": "Essential bug fixes for Hytale Early Access servers. Prevents crashes, player kicks, and sync issues.",
   "Main": "com.hyfixes.HyFixes",
   "Authors": [

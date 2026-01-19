@@ -7,6 +7,7 @@ import com.hyfixes.commands.CleanWarpsCommand;
 import com.hyfixes.commands.FixCounterCommand;
 import com.hyfixes.commands.InteractionStatusCommand;
 import com.hyfixes.commands.WhoCommand;
+import com.hyfixes.config.ConfigManager;
 import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
 import com.hyfixes.listeners.InteractionManagerSanitizer;
@@ -76,6 +77,17 @@ public class HyFixes extends JavaPlugin {
     protected void setup() {
         getLogger().at(Level.INFO).log("Setting up HyFixes...");
 
+        // Initialize configuration first
+        ConfigManager config = ConfigManager.getInstance();
+        if (config.isLoadedFromFile()) {
+            getLogger().at(Level.INFO).log("[CONFIG] Loaded configuration from mods/hyfixes/config.json");
+        } else {
+            getLogger().at(Level.INFO).log("[CONFIG] Using default configuration (config.json generated)");
+        }
+        if (config.hasEnvironmentOverrides()) {
+            getLogger().at(Level.INFO).log("[CONFIG] Environment variable overrides applied");
+        }
+
         // Register bug fix systems
         registerBugFixes();
 
@@ -83,40 +95,59 @@ public class HyFixes extends JavaPlugin {
     }
 
     private void registerBugFixes() {
+        ConfigManager config = ConfigManager.getInstance();
+
         // Fix 1: Pickup item null targetRef crash
         // Hytale's PickupItemSystem.tick() crashes if getTargetRef() returns null
-        getEntityStoreRegistry().registerSystem(new PickupItemSanitizer(this));
-        getLogger().at(Level.INFO).log("[FIX] PickupItemSanitizer registered - prevents world crash from corrupted items");
+        if (config.isSanitizerEnabled("pickupItem")) {
+            getEntityStoreRegistry().registerSystem(new PickupItemSanitizer(this));
+            getLogger().at(Level.INFO).log("[FIX] PickupItemSanitizer registered - prevents world crash from corrupted items");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] PickupItemSanitizer - disabled via config");
+        }
 
         // Fix 2: RespawnBlock null respawnPoints crash
         // Hytale's RespawnBlock$OnRemove.onEntityRemove() crashes if respawnPoints is null
-        getChunkStoreRegistry().registerSystem(new RespawnBlockSanitizer(this));
-        getLogger().at(Level.INFO).log("[FIX] RespawnBlockSanitizer registered - prevents crash when breaking respawn blocks");
+        if (config.isSanitizerEnabled("respawnBlock")) {
+            getChunkStoreRegistry().registerSystem(new RespawnBlockSanitizer(this));
+            getLogger().at(Level.INFO).log("[FIX] RespawnBlockSanitizer registered - prevents crash when breaking respawn blocks");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] RespawnBlockSanitizer - disabled via config");
+        }
 
         // Fix 3: ProcessingBench window NPE crash
         // Hytale's ProcessingBenchState.onDestroy() crashes when windows have null refs
-        getChunkStoreRegistry().registerSystem(new ProcessingBenchSanitizer(this));
-        getLogger().at(Level.INFO).log("[FIX] ProcessingBenchSanitizer registered - prevents crash when breaking benches with open windows");
+        if (config.isSanitizerEnabled("processingBench")) {
+            getChunkStoreRegistry().registerSystem(new ProcessingBenchSanitizer(this));
+            getLogger().at(Level.INFO).log("[FIX] ProcessingBenchSanitizer registered - prevents crash when breaking benches with open windows");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] ProcessingBenchSanitizer - disabled via config");
+        }
 
         // Fix 4: Empty archetype entity monitoring
         // Monitors for entities with invalid state (empty archetypes)
-        getEntityStoreRegistry().registerSystem(new EmptyArchetypeSanitizer(this));
-        getLogger().at(Level.INFO).log("[FIX] EmptyArchetypeSanitizer registered - monitors for invalid entity states");
+        if (config.isSanitizerEnabled("emptyArchetype")) {
+            getEntityStoreRegistry().registerSystem(new EmptyArchetypeSanitizer(this));
+            getLogger().at(Level.INFO).log("[FIX] EmptyArchetypeSanitizer registered - monitors for invalid entity states");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] EmptyArchetypeSanitizer - disabled via config");
+        }
 
         // Fix 5: Instance exit missing return world crash
         // Tracks player positions before entering instances and restores them if exit fails
-        instancePositionTracker = new InstancePositionTracker(this);
-        instancePositionTracker.register();
-        getLogger().at(Level.INFO).log("[FIX] InstancePositionTracker registered - prevents crash when exiting instances with missing return world");
+        if (config.isSanitizerEnabled("instancePositionTracker")) {
+            instancePositionTracker = new InstancePositionTracker(this);
+            instancePositionTracker.register();
+            getLogger().at(Level.INFO).log("[FIX] InstancePositionTracker registered - prevents crash when exiting instances with missing return world");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] InstancePositionTracker - disabled via config");
+        }
 
         // Fix 6: Chunk memory bloat - chunks not unloading (v1.2.0)
         // Uses reflection to discover and call chunk unload APIs
-        // NOTE: Can be disabled via HYFIXES_DISABLE_CHUNK_UNLOAD=true for BetterMap compatibility (Issue #21)
-        boolean disableChunkUnload = "true".equalsIgnoreCase(System.getenv("HYFIXES_DISABLE_CHUNK_UNLOAD")) ||
-                                     "true".equalsIgnoreCase(System.getProperty("hyfixes.disableChunkUnload"));
-
-        if (disableChunkUnload) {
-            getLogger().at(Level.INFO).log("[DISABLED] ChunkUnloadManager - disabled via config (HYFIXES_DISABLE_CHUNK_UNLOAD=true)");
+        // NOTE: Can be disabled via config or HYFIXES_DISABLE_CHUNK_UNLOAD=true for BetterMap compatibility (Issue #21)
+        if (!config.isChunkUnloadEnabled()) {
+            getLogger().at(Level.INFO).log("[DISABLED] ChunkUnloadManager - disabled via config");
             getLogger().at(Level.INFO).log("[DISABLED] This improves compatibility with BetterMap and other map plugins");
             chunkUnloadManager = null;
             chunkCleanupSystem = null;
@@ -133,20 +164,28 @@ public class HyFixes extends JavaPlugin {
             chunkUnloadManager.setChunkCleanupSystem(chunkCleanupSystem);
             chunkUnloadManager.start();
             getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
-            getLogger().at(Level.INFO).log("[TIP] To disable for BetterMap compatibility, set HYFIXES_DISABLE_CHUNK_UNLOAD=true");
+            getLogger().at(Level.INFO).log("[TIP] To disable for BetterMap compatibility, set chunkUnload.enabled=false in config.json");
         }
 
         // Fix 7: GatherObjectiveTask null ref crash (v1.3.0)
         // Validates refs in quest objectives before they can crash
-        gatherObjectiveTaskSanitizer = new GatherObjectiveTaskSanitizer(this);
-        getEntityStoreRegistry().registerSystem(gatherObjectiveTaskSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] GatherObjectiveTaskSanitizer registered - prevents crash from null refs in quest objectives");
+        if (config.isSanitizerEnabled("gatherObjective")) {
+            gatherObjectiveTaskSanitizer = new GatherObjectiveTaskSanitizer(this);
+            getEntityStoreRegistry().registerSystem(gatherObjectiveTaskSanitizer);
+            getLogger().at(Level.INFO).log("[FIX] GatherObjectiveTaskSanitizer registered - prevents crash from null refs in quest objectives");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] GatherObjectiveTaskSanitizer - disabled via config");
+        }
 
         // Fix 8: Pickup item chunk handler backup (v1.3.0)
         // RefSystem backup for catching null targetRef during chunk unloads
-        pickupItemChunkHandler = new PickupItemChunkHandler(this);
-        getEntityStoreRegistry().registerSystem(pickupItemChunkHandler);
-        getLogger().at(Level.INFO).log("[FIX] PickupItemChunkHandler registered - backup protection during chunk unloads");
+        if (config.isSanitizerEnabled("pickupItemChunkHandler")) {
+            pickupItemChunkHandler = new PickupItemChunkHandler(this);
+            getEntityStoreRegistry().registerSystem(pickupItemChunkHandler);
+            getLogger().at(Level.INFO).log("[FIX] PickupItemChunkHandler registered - backup protection during chunk unloads");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] PickupItemChunkHandler - disabled via config");
+        }
 
         // Fix 9: InteractionChain monitoring (v1.3.0)
         // Tracks unfixable Hytale bugs for reporting to developers
@@ -156,23 +195,35 @@ public class HyFixes extends JavaPlugin {
 
         // Fix 10: CraftingManager bench already set crash (v1.3.1)
         // Clears stale bench references before they cause IllegalArgumentException
-        craftingManagerSanitizer = new CraftingManagerSanitizer(this);
-        getEntityStoreRegistry().registerSystem(craftingManagerSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] CraftingManagerSanitizer registered - prevents bench already set crash");
+        if (config.isSanitizerEnabled("craftingManager")) {
+            craftingManagerSanitizer = new CraftingManagerSanitizer(this);
+            getEntityStoreRegistry().registerSystem(craftingManagerSanitizer);
+            getLogger().at(Level.INFO).log("[FIX] CraftingManagerSanitizer registered - prevents bench already set crash");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] CraftingManagerSanitizer - disabled via config");
+        }
 
         // Fix 11: InteractionManager NPE crash when opening crafttables (v1.3.1)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/1
         // Validates interaction chains and removes ones with null context before they cause NPE
-        interactionManagerSanitizer = new InteractionManagerSanitizer(this);
-        getEntityStoreRegistry().registerSystem(interactionManagerSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] InteractionManagerSanitizer registered - prevents crafttable interaction crash");
+        if (config.isSanitizerEnabled("interactionManager")) {
+            interactionManagerSanitizer = new InteractionManagerSanitizer(this);
+            getEntityStoreRegistry().registerSystem(interactionManagerSanitizer);
+            getLogger().at(Level.INFO).log("[FIX] InteractionManagerSanitizer registered - prevents crafttable interaction crash");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] InteractionManagerSanitizer - disabled via config");
+        }
 
         // Fix 12: SpawnBeacon null RoleSpawnParameters crash (v1.3.7)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/4
         // Validates spawn parameters before BeaconSpawnController.createRandomSpawnJob() can crash
-        spawnBeaconSanitizer = new SpawnBeaconSanitizer(this);
-        getEntityStoreRegistry().registerSystem(spawnBeaconSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] SpawnBeaconSanitizer registered - prevents spawn beacon null parameter crash");
+        if (config.isSanitizerEnabled("spawnBeacon")) {
+            spawnBeaconSanitizer = new SpawnBeaconSanitizer(this);
+            getEntityStoreRegistry().registerSystem(spawnBeaconSanitizer);
+            getLogger().at(Level.INFO).log("[FIX] SpawnBeaconSanitizer registered - prevents spawn beacon null parameter crash");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] SpawnBeaconSanitizer - disabled via config");
+        }
 
         // Fix 13: SpawnMarkerReference null npcReferences crash (v1.3.8)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/5
@@ -183,9 +234,13 @@ public class HyFixes extends JavaPlugin {
         // Fix 14: ChunkTracker null PlayerRef crash (v1.3.9)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/6
         // Prevents world crash when ChunkTracker has invalid PlayerRefs after player disconnect
-        chunkTrackerSanitizer = new ChunkTrackerSanitizer(this);
-        getEntityStoreRegistry().registerSystem(chunkTrackerSanitizer);
-        getLogger().at(Level.INFO).log("[FIX] ChunkTrackerSanitizer registered - prevents chunk unload crash after player disconnect");
+        if (config.isSanitizerEnabled("chunkTracker")) {
+            chunkTrackerSanitizer = new ChunkTrackerSanitizer(this);
+            getEntityStoreRegistry().registerSystem(chunkTrackerSanitizer);
+            getLogger().at(Level.INFO).log("[FIX] ChunkTrackerSanitizer registered - prevents chunk unload crash after player disconnect");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] ChunkTrackerSanitizer - disabled via config");
+        }
 
         // Fix 15: Instance teleport race condition (v1.3.10)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/7

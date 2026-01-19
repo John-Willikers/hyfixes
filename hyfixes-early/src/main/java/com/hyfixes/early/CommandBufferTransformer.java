@@ -1,5 +1,6 @@
 package com.hyfixes.early;
 
+import com.hyfixes.early.config.EarlyConfigManager;
 import com.hypixel.hytale.plugin.early.ClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -49,6 +50,12 @@ public class CommandBufferTransformer implements ClassTransformer {
     public byte[] transform(String className, String packageName, byte[] classBytes) {
         // Only transform the CommandBuffer class
         if (!className.equals(TARGET_CLASS)) {
+            return classBytes;
+        }
+
+        // Check if transformer is enabled via config
+        if (!EarlyConfigManager.getInstance().isTransformerEnabled("commandBuffer")) {
+            System.out.println("[HyFixes-Early] CommandBufferTransformer DISABLED by config");
             return classBytes;
         }
 

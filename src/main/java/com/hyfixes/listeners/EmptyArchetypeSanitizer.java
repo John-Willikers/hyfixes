@@ -1,6 +1,7 @@
 package com.hyfixes.listeners;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.config.ConfigManager;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -45,8 +46,15 @@ public class EmptyArchetypeSanitizer extends EntityTickingSystem<EntityStore> {
     private int checkedCount = 0;
     private int removedCount = 0;
 
+    // Configuration (loaded from ConfigManager)
+    private final int skipFirstN;
+    private final int logEveryN;
+
     public EmptyArchetypeSanitizer(HyFixes plugin) {
         this.plugin = plugin;
+        ConfigManager config = ConfigManager.getInstance();
+        this.skipFirstN = config.getEmptyArchetypeSkipFirstN();
+        this.logEveryN = config.getEmptyArchetypeLogEveryN();
     }
 
     @Override
@@ -74,14 +82,14 @@ public class EmptyArchetypeSanitizer extends EntityTickingSystem<EntityStore> {
             // Get the TransformComponent
             TransformComponent transform = chunk.getComponent(entityIndex, TransformComponent.getComponentType());
 
-            // Skip first 1000 entities silently to avoid log spam on startup
+            // Skip first N entities silently to avoid log spam on startup
             checkedCount++;
-            if (checkedCount <= 1000) {
+            if (checkedCount <= skipFirstN) {
                 return;
             }
 
             // Only log occasionally to avoid spam
-            if (checkedCount % 10000 == 0) {
+            if (checkedCount % logEveryN == 0) {
                 plugin.getLogger().at(Level.FINE).log(
                     "[EmptyArchetypeSanitizer] Checked " + checkedCount + " entities"
                 );

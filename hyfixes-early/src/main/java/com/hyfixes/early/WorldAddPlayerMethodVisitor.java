@@ -1,5 +1,6 @@
 package com.hyfixes.early;
 
+import com.hyfixes.early.config.EarlyConfigManager;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -35,6 +36,11 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
     private final String className;
     private final MethodVisitor target;
 
+    // Configuration (loaded from EarlyConfigManager)
+    private final int retryCount;
+    private final long retryDelayMs;
+    private final long retryDelayNanos;
+
     // State machine for detecting the pattern
     private boolean sawPlayerAlreadyInWorldString = false;
 
@@ -42,6 +48,12 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
         super(Opcodes.ASM9, null);
         this.target = mv;
         this.className = className;
+
+        // Load configuration
+        EarlyConfigManager config = EarlyConfigManager.getInstance();
+        this.retryCount = config.getWorldRetryCount();
+        this.retryDelayMs = config.getWorldRetryDelayMs();
+        this.retryDelayNanos = retryDelayMs * 1_000_000L; // Convert ms to nanos
     }
 
     @Override
@@ -69,11 +81,11 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
             target.visitLdcInsn("[HyFixes-Early] Player reference not null - waiting for drain (race condition handling)");
             target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 
-            // Unrolled retry loop - 5 iterations x 20ms = 100ms max wait
-            // No try-catch needed - we'll use Thread.onSpinWait() or simple busy-wait alternative
-            // Actually, let's use a simple approach: LockSupport.parkNanos which doesn't throw
+            // Unrolled retry loop - retryCount iterations x retryDelayMs each
+            // No try-catch needed - we'll use LockSupport.parkNanos which doesn't throw
+            long totalWaitMs = retryCount * retryDelayMs;
 
-            for (int retry = 0; retry < 5; retry++) {
+            for (int retry = 0; retry < retryCount; retry++) {
                 // Check if reference cleared
                 target.visitVarInsn(Opcodes.ALOAD, playerRefSlot);
                 target.visitMethodInsn(
@@ -85,8 +97,8 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
                 );
                 target.visitJumpInsn(Opcodes.IFNULL, retryContinue);
 
-                // Use LockSupport.parkNanos(20_000_000L) - 20ms, doesn't throw InterruptedException
-                target.visitLdcInsn(20_000_000L);  // 20ms in nanoseconds
+                // Use LockSupport.parkNanos - configured delay, doesn't throw InterruptedException
+                target.visitLdcInsn(retryDelayNanos);
                 target.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/util/concurrent/locks/LockSupport",
@@ -107,9 +119,9 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
             );
             target.visitJumpInsn(Opcodes.IFNULL, retryContinue);
 
-            // Still not null after 100ms - log failure and throw
+            // Still not null after configured wait time - log failure and throw
             target.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-            target.visitLdcInsn("[HyFixes-Early] Retry FAILED - player still in world after 100ms, throwing exception");
+            target.visitLdcInsn("[HyFixes-Early] Retry FAILED - player still in world after " + totalWaitMs + "ms, throwing exception");
             target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 
             // Recreate and throw the exception

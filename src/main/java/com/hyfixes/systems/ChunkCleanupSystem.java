@@ -1,6 +1,7 @@
 package com.hyfixes.systems;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.config.ConfigManager;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Store;
@@ -20,7 +21,7 @@ import java.util.logging.Level;
  * This system extends EntityTickingSystem to ensure our cleanup methods
  * are called from the main server thread, avoiding InvocationTargetExceptions.
  *
- * It runs every CLEANUP_INTERVAL_TICKS ticks (default: 600 = 30 seconds at 20 TPS)
+ * It runs every cleanupIntervalTicks ticks (default: 600 = 30 seconds at 20 TPS)
  *
  * NOTE: We only call invalidateLoadedChunks() here. The waitForLoadingChunks()
  * method was removed because calling it from within a system tick causes
@@ -31,8 +32,8 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
 
     private final HyFixes plugin;
 
-    // Configuration
-    private static final int CLEANUP_INTERVAL_TICKS = 600; // 30 seconds at 20 TPS
+    // Configuration (loaded from ConfigManager)
+    private final int cleanupIntervalTicks;
 
     // State
     private final AtomicInteger tickCounter = new AtomicInteger(0);
@@ -51,6 +52,7 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
 
     public ChunkCleanupSystem(HyFixes plugin) {
         this.plugin = plugin;
+        this.cleanupIntervalTicks = ConfigManager.getInstance().getChunkCleanupIntervalTicks();
     }
 
     @Override
@@ -76,7 +78,7 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
         if (!loggedOnce) {
             plugin.getLogger().at(Level.INFO).log(
                 "[ChunkCleanupSystem] Active on MAIN THREAD - will run cleanup every " +
-                (CLEANUP_INTERVAL_TICKS / 20) + " seconds"
+                (cleanupIntervalTicks / 20) + " seconds"
             );
             loggedOnce = true;
         }
@@ -84,8 +86,8 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
         // Increment tick counter
         int currentTick = tickCounter.incrementAndGet();
 
-        // Only run cleanup every CLEANUP_INTERVAL_TICKS
-        if (currentTick % CLEANUP_INTERVAL_TICKS != 0) {
+        // Only run cleanup every cleanupIntervalTicks
+        if (currentTick % cleanupIntervalTicks != 0) {
             return;
         }
 
@@ -207,7 +209,7 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             successCount.get(),
             threadErrorCount.get(),
             lastRunStr,
-            CLEANUP_INTERVAL_TICKS / 20
+            cleanupIntervalTicks / 20
         );
     }
 }

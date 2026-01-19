@@ -1,6 +1,7 @@
 package com.hyfixes.systems;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.config.ConfigManager;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Store;
@@ -39,8 +40,8 @@ public class InteractionChainMonitor extends EntityTickingSystem<EntityStore> {
 
     private final HyFixes plugin;
 
-    // Timing
-    private static final int LOG_INTERVAL_TICKS = 6000; // 5 minutes at 20 TPS
+    // Timing (configurable)
+    private final int logIntervalTicks;
     private final AtomicInteger tickCounter = new AtomicInteger(0);
     private final AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
     private final AtomicLong lastLogTime = new AtomicLong(0);
@@ -87,6 +88,7 @@ public class InteractionChainMonitor extends EntityTickingSystem<EntityStore> {
 
     public InteractionChainMonitor(HyFixes plugin) {
         this.plugin = plugin;
+        this.logIntervalTicks = ConfigManager.getInstance().getMonitorLogIntervalTicks();
     }
 
     @Override
@@ -117,7 +119,7 @@ public class InteractionChainMonitor extends EntityTickingSystem<EntityStore> {
         int ticks = tickCounter.incrementAndGet();
 
         // Periodic logging
-        if (ticks % LOG_INTERVAL_TICKS == 0) {
+        if (ticks % logIntervalTicks == 0) {
             logPeriodicSummary();
         }
     }

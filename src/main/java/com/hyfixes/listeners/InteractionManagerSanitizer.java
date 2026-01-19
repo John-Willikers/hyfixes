@@ -1,6 +1,7 @@
 package com.hyfixes.listeners;
 
 import com.hyfixes.HyFixes;
+import com.hyfixes.config.ConfigManager;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -59,9 +60,9 @@ public class InteractionManagerSanitizer extends EntityTickingSystem<EntityStore
     private Method cancelMethod = null;  // InteractionChain.cancel() or similar
     private Object waitingForClientDataState = null;  // CallState.WAITING_FOR_CLIENT_DATA enum value
 
-    // Client timeout threshold - 2000ms (1 full second before Hytale's ~3 second kick)
+    // Client timeout threshold - configurable (default 2000ms)
     // Lowered from 2500ms in v1.3.6 to catch more timeout issues before player gets kicked
-    private static final long CLIENT_TIMEOUT_MS = 2000;
+    private final long clientTimeoutMs;
 
     // Track chains waiting for client data: chainKey -> firstSeenTimestamp
     private final ConcurrentHashMap<String, Long> waitingChains = new ConcurrentHashMap<>();
@@ -78,6 +79,7 @@ public class InteractionManagerSanitizer extends EntityTickingSystem<EntityStore
 
     public InteractionManagerSanitizer(HyFixes plugin) {
         this.plugin = plugin;
+        this.clientTimeoutMs = ConfigManager.getInstance().getInteractionManagerClientTimeoutMs();
     }
 
     @Override
@@ -177,14 +179,14 @@ public class InteractionManagerSanitizer extends EntityTickingSystem<EntityStore
                             if (firstSeen == null) {
                                 // First time seeing this chain waiting
                                 waitingChains.put(chainKey, now);
-                            } else if (now - firstSeen > CLIENT_TIMEOUT_MS) {
+                            } else if (now - firstSeen > clientTimeoutMs) {
                                 // Chain has been waiting too long - proactively cancel it
                                 chainsToRemove.add(chainId);
                                 waitingChains.remove(chainKey);
                                 timeoutsPrevented.incrementAndGet();
                                 plugin.getLogger().at(Level.WARNING).log(
                                         "[InteractionManagerSanitizer] Chain waiting for client data > " +
-                                        CLIENT_TIMEOUT_MS + "ms, removing to prevent kick (chain " + chainId + ")");
+                                        clientTimeoutMs + "ms, removing to prevent kick (chain " + chainId + ")");
                             }
                         } else {
                             // Chain not waiting anymore - remove from tracking
@@ -339,7 +341,7 @@ public class InteractionManagerSanitizer extends EntityTickingSystem<EntityStore
                 timeoutDetectionEnabled = true;
                 plugin.getLogger().at(Level.INFO).log(
                         "[InteractionManagerSanitizer] Client timeout detection ENABLED (" +
-                        CLIENT_TIMEOUT_MS + "ms threshold)");
+                        clientTimeoutMs + "ms threshold)");
             } else {
                 plugin.getLogger().at(Level.INFO).log(
                         "[InteractionManagerSanitizer] Client timeout detection not available " +
