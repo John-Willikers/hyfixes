@@ -21,10 +21,8 @@ import java.util.logging.Level;
 /**
  * HyFixes Admin Dashboard - Visual UI for managing and monitoring HyFixes.
  *
- * Replaces chat-spamming /hyfixes commands with a clean CustomUIPage dashboard
- * showing statistics, sanitizer status, chunk info, and configuration options.
- *
- * Uses CommandListPage.ui as the base layout with tabbed navigation.
+ * Uses CommandListPage.ui as the base layout with BasicTextButton.ui for tabs
+ * and SubcommandCard.ui for content display.
  */
 public class HyFixesDashboardPage extends InteractiveCustomUIPage<DashboardEventData> {
 
@@ -37,7 +35,7 @@ public class HyFixesDashboardPage extends InteractiveCustomUIPage<DashboardEvent
     private static final String TAB_CHUNKS = "chunks";
     private static final String TAB_CONFIG = "config";
 
-    // Colors for UI elements
+    // Colors
     private static final String COLOR_GREEN = "#3d913f";
     private static final String COLOR_YELLOW = "#c9a227";
     private static final String COLOR_RED = "#962f2f";
@@ -52,235 +50,333 @@ public class HyFixesDashboardPage extends InteractiveCustomUIPage<DashboardEvent
     @Override
     public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder events, Store<EntityStore> store) {
         try {
-            // Use CommandListPage.ui as base - it has tabs, content area, and good structure
+            // Use CommandListPage.ui as base - the working layout
             cmd.append("Pages/CommandListPage.ui");
 
-            // Set the page title
+            // Set the title
             cmd.set("#CommandName.Text", "HyFixes Dashboard");
-            cmd.set("#CommandDescription.Text", "Admin monitoring and configuration panel");
+            cmd.set("#CommandDescription.Text", "Tab: " + currentTab.toUpperCase());
 
-            // Clear default content
-            cmd.clear("#List");
+            // Hide elements we don't need
+            cmd.set("#BackButton.Visible", false);
+            cmd.set("#SendToChatButton.Visible", false);
 
-            // Build tab navigation
-            buildTabNavigation(cmd, events);
+            // Clear the command list for our tabs
+            cmd.clear("#CommandList");
+
+            // Build tab buttons using BasicTextButton.ui
+            int btnIndex = 0;
+            btnIndex = addTabButton(cmd, events, btnIndex, "Overview", TAB_OVERVIEW);
+            btnIndex = addTabButton(cmd, events, btnIndex, "Sanitizers", TAB_SANITIZERS);
+            btnIndex = addTabButton(cmd, events, btnIndex, "Chunks", TAB_CHUNKS);
+            btnIndex = addTabButton(cmd, events, btnIndex, "Config", TAB_CONFIG);
+            btnIndex = addTabButton(cmd, events, btnIndex, "[Refresh]", "refresh");
+
+            // Clear the subcommand cards area for our content
+            cmd.clear("#SubcommandCards");
 
             // Build content based on current tab
+            int cardIndex = 0;
             switch (currentTab) {
-                case TAB_OVERVIEW -> buildOverviewTab(cmd, events);
-                case TAB_SANITIZERS -> buildSanitizersTab(cmd, events);
-                case TAB_CHUNKS -> buildChunksTab(cmd, events);
-                case TAB_CONFIG -> buildConfigTab(cmd, events);
-                default -> buildOverviewTab(cmd, events);
+                case TAB_OVERVIEW -> cardIndex = buildOverviewContent(cmd, events, cardIndex);
+                case TAB_SANITIZERS -> cardIndex = buildSanitizersContent(cmd, events, cardIndex);
+                case TAB_CHUNKS -> cardIndex = buildChunksContent(cmd, events, cardIndex);
+                case TAB_CONFIG -> cardIndex = buildConfigContent(cmd, events, cardIndex);
+                default -> cardIndex = buildOverviewContent(cmd, events, cardIndex);
             }
 
-            // Add refresh button binding using EventData
-            events.addEventBinding(CustomUIEventBindingType.Activating, "#RefreshButton",
-                    EventData.of("action", "refresh"));
+            // Show the subcommand section
+            cmd.set("#SubcommandSection.Visible", true);
 
         } catch (Exception e) {
             HyFixes.getInstance().getLogger().at(Level.WARNING).withCause(e)
                     .log("[Dashboard] Error building dashboard page");
-            cmd.set("#CommandDescription.Text", "Error loading dashboard: " + e.getMessage());
         }
     }
 
-    /**
-     * Build the tab navigation buttons at the top of the dashboard.
-     */
-    private void buildTabNavigation(UICommandBuilder cmd, UIEventBuilder events) {
-        // Add tab buttons as inline UI
-        StringBuilder tabs = new StringBuilder();
-        tabs.append("Group { direction: horizontal; spacing: 10; margin: [10, 10, 10, 10]; children: [");
+    private int addTabButton(UICommandBuilder cmd, UIEventBuilder events, int index, String label, String action) {
+        cmd.append("#CommandList", "Pages/BasicTextButton.ui");
 
-        // Overview tab
-        String overviewStyle = currentTab.equals(TAB_OVERVIEW) ? COLOR_GOLD : COLOR_GRAY;
-        tabs.append("Button { id: TabOverview; style: { textColor: \"").append(overviewStyle).append("\"; }; ");
-        tabs.append("text: \"Overview\"; }");
+        // Format: show which tab is selected
+        String displayLabel = label;
+        boolean isTab = !action.equals("refresh");
+        if (isTab && currentTab.equals(action)) {
+            displayLabel = "> " + label + " <";
+        }
 
-        // Sanitizers tab
-        String sanitizersStyle = currentTab.equals(TAB_SANITIZERS) ? COLOR_GOLD : COLOR_GRAY;
-        tabs.append(", Button { id: TabSanitizers; style: { textColor: \"").append(sanitizersStyle).append("\"; }; ");
-        tabs.append("text: \"Sanitizers\"; }");
+        // Use .Text for setting text on BasicTextButton
+        cmd.set("#CommandList[" + index + "].Text", displayLabel);
 
-        // Chunks tab
-        String chunksStyle = currentTab.equals(TAB_CHUNKS) ? COLOR_GOLD : COLOR_GRAY;
-        tabs.append(", Button { id: TabChunks; style: { textColor: \"").append(chunksStyle).append("\"; }; ");
-        tabs.append("text: \"Chunks\"; }");
+        // Bind click event - use just the index selector for the button
+        String selector = "#CommandList[" + index + "]";
+        if (action.equals("refresh")) {
+            events.addEventBinding(CustomUIEventBindingType.Activating, selector,
+                    EventData.of("Action", "refresh"));
+        } else {
+            events.addEventBinding(CustomUIEventBindingType.Activating, selector,
+                    EventData.of("Action", "selectTab").put("Value", action));
+        }
 
-        // Config tab
-        String configStyle = currentTab.equals(TAB_CONFIG) ? COLOR_GOLD : COLOR_GRAY;
-        tabs.append(", Button { id: TabConfig; style: { textColor: \"").append(configStyle).append("\"; }; ");
-        tabs.append("text: \"Config\"; }");
-
-        // Refresh button
-        tabs.append(", Button { id: RefreshButton; style: { textColor: \"").append(COLOR_GREEN).append("\"; }; ");
-        tabs.append("text: \"[Refresh]\"; }");
-
-        tabs.append("] }");
-
-        cmd.appendInline("#TabContainer", tabs.toString());
-
-        // Bind tab button events using EventData
-        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabOverview",
-                EventData.of("action", "selectTab").put("value", TAB_OVERVIEW));
-        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabSanitizers",
-                EventData.of("action", "selectTab").put("value", TAB_SANITIZERS));
-        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabChunks",
-                EventData.of("action", "selectTab").put("value", TAB_CHUNKS));
-        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabConfig",
-                EventData.of("action", "selectTab").put("value", TAB_CONFIG));
+        return index + 1;
     }
 
-    /**
-     * Build the Overview tab with key statistics and system health.
-     */
-    private void buildOverviewTab(UICommandBuilder cmd, UIEventBuilder events) {
-        DashboardStats stats = DashboardStats.collect();
-
-        // Add overview content
-        addStatItem(cmd, 0, "Total Crashes Prevented", String.valueOf(stats.getTotalCrashesPrevented()), COLOR_GREEN);
-        addStatItem(cmd, 1, "Active Sanitizers", stats.getActiveSanitizers() + " / " + stats.getTotalSanitizers(), COLOR_WHITE);
-        addStatItem(cmd, 2, "System Health", stats.getHealthStatus(), stats.getHealthColor());
-        addStatItem(cmd, 3, "Memory Usage", stats.getMemoryUsage(), stats.getMemoryColor());
-        addStatItem(cmd, 4, "Server Uptime", stats.getUptime(), COLOR_WHITE);
-        addStatItem(cmd, 5, "Protected Chunks", String.valueOf(stats.getProtectedChunks()), COLOR_WHITE);
-        addStatItem(cmd, 6, "Chunk Unload Rate", stats.getChunkUnloadRate(), COLOR_WHITE);
-        addStatItem(cmd, 7, "Plugin Version", stats.getPluginVersion(), COLOR_GRAY);
+    // PluginList-based methods for full-width layout
+    private int addPluginItem(UICommandBuilder cmd, int index, String name, String version, String identifier, String description) {
+        cmd.append("#PluginList", "Pages/PluginListButton.ui");
+        String selector = "#PluginList[" + index + "]";
+        // PluginListButton just has #Button.Text for the display text
+        // Format: "NAME | VERSION | TAG | Description"
+        String displayText = name;
+        if (!version.isEmpty()) {
+            displayText += " - " + version;
+        }
+        if (!identifier.isEmpty()) {
+            displayText += " [" + identifier + "]";
+        }
+        cmd.set(selector + " #Button.Text", displayText);
+        return index + 1;
     }
 
-    /**
-     * Build the Sanitizers tab with a list of all sanitizers and their status.
-     */
-    private void buildSanitizersTab(UICommandBuilder cmd, UIEventBuilder events) {
+    private int buildOverviewPluginList(UICommandBuilder cmd, UIEventBuilder events, int index) {
         DashboardStats stats = DashboardStats.collect();
 
-        int index = 0;
+        index = addPluginItem(cmd, index, "Crashes Prevented", String.valueOf(stats.getTotalCrashesPrevented()), "STAT", "Total server crashes prevented by HyFixes");
+        index = addPluginItem(cmd, index, "Active Sanitizers", stats.getActiveSanitizers() + "/" + stats.getTotalSanitizers(), "STAT", "Currently enabled crash prevention systems");
+        index = addPluginItem(cmd, index, "System Health", stats.getHealthStatus(), "STAT", "Overall system health status");
+        index = addPluginItem(cmd, index, "Memory Usage", stats.getMemoryUsage(), "STAT", "Current server memory consumption");
+        index = addPluginItem(cmd, index, "Server Uptime", stats.getUptime(), "STAT", "Time since server started");
+        index = addPluginItem(cmd, index, "Protected Chunks", String.valueOf(stats.getProtectedChunks()), "STAT", "Chunks protected from unloading");
+        index = addPluginItem(cmd, index, "Unload Success", stats.getChunkUnloadRate(), "STAT", "Chunk unload success rate");
+
+        return index;
+    }
+
+    private int buildSanitizersPluginList(UICommandBuilder cmd, UIEventBuilder events, int index) {
+        DashboardStats stats = DashboardStats.collect();
+
         for (DashboardStats.SanitizerInfo sanitizer : stats.getSanitizerInfos()) {
-            String statusColor = sanitizer.isEnabled() ? COLOR_GREEN : COLOR_RED;
-            String statusText = sanitizer.isEnabled() ? "ON" : "OFF";
-
-            addSanitizerItem(cmd, index++, sanitizer.getName(), statusText, statusColor,
-                    "Fixes: " + sanitizer.getFixCount());
+            String status = sanitizer.isEnabled() ? "ON" : "OFF";
+            index = addPluginItem(cmd, index, sanitizer.getName(), status, sanitizer.getFixCount() + " fixes", sanitizer.isEnabled() ? "Actively protecting server" : "Currently disabled");
         }
+
+        return index;
     }
 
-    /**
-     * Build the Chunks tab with chunk management statistics.
-     */
-    private void buildChunksTab(UICommandBuilder cmd, UIEventBuilder events) {
+    private int buildChunksPluginList(UICommandBuilder cmd, UIEventBuilder events, int index) {
         DashboardStats stats = DashboardStats.collect();
 
-        addStatItem(cmd, 0, "Protected Chunks", String.valueOf(stats.getProtectedChunks()), COLOR_GREEN);
-        addStatItem(cmd, 1, "Chunk Protection", stats.isChunkProtectionEnabled() ? "ENABLED" : "DISABLED",
-                stats.isChunkProtectionEnabled() ? COLOR_GREEN : COLOR_RED);
-        addStatItem(cmd, 2, "Map-Aware Mode", stats.isMapAwareModeEnabled() ? "ENABLED" : "DISABLED",
-                stats.isMapAwareModeEnabled() ? COLOR_GREEN : COLOR_GRAY);
-        addStatItem(cmd, 3, "Unload Attempts", String.valueOf(stats.getChunkUnloadAttempts()), COLOR_WHITE);
-        addStatItem(cmd, 4, "Unload Successes", String.valueOf(stats.getChunkUnloadSuccesses()), COLOR_GREEN);
-        addStatItem(cmd, 5, "Success Rate", stats.getChunkUnloadRate(), COLOR_WHITE);
-        addStatItem(cmd, 6, "Last Cleanup", stats.getLastCleanupTime(), COLOR_GRAY);
-        addStatItem(cmd, 7, "Cleanup Interval", stats.getCleanupInterval() + " ticks", COLOR_GRAY);
+        index = addPluginItem(cmd, index, "Protected Chunks", String.valueOf(stats.getProtectedChunks()), "COUNT", "Chunks protected from cleanup");
+        String protStatus = stats.isChunkProtectionEnabled() ? "ENABLED" : "DISABLED";
+        index = addPluginItem(cmd, index, "Chunk Protection", protStatus, "MODE", "Prevents important chunks from unloading");
+        String mapStatus = stats.isMapAwareModeEnabled() ? "ENABLED" : "DISABLED";
+        index = addPluginItem(cmd, index, "Map-Aware Mode", mapStatus, "MODE", "Pre-renders maps before chunk unload");
+        index = addPluginItem(cmd, index, "Unload Stats", stats.getChunkUnloadAttempts() + " / " + stats.getChunkUnloadSuccesses(), "STATS", "Attempts / Successes");
+        index = addPluginItem(cmd, index, "Success Rate", stats.getChunkUnloadRate(), "RATE", "Percentage of successful unloads");
+        index = addPluginItem(cmd, index, "Last Cleanup", stats.getLastCleanupTime(), "TIME", "When last cleanup occurred");
+        index = addPluginItem(cmd, index, "Cleanup Interval", stats.getCleanupInterval() + " ticks", "CFG", "Time between cleanup cycles");
+
+        return index;
     }
 
-    /**
-     * Build the Config tab with settings display and toggle buttons.
-     */
-    private void buildConfigTab(UICommandBuilder cmd, UIEventBuilder events) {
+    private int buildConfigPluginList(UICommandBuilder cmd, UIEventBuilder events, int index) {
         ConfigManager configManager = ConfigManager.getInstance();
         HyFixesConfig config = configManager.getConfig();
 
-        int index = 0;
+        // Toggleable options
+        String verboseStatus = config.isVerbose() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Verbose Logging", verboseStatus, "CLICK", "Toggle detailed logging");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "verbose"));
 
-        // Verbose Logging toggle
-        addToggleItem(cmd, events, index++, "Verbose Logging", config.isVerbose(),
-                "toggleConfig", "verbose");
+        String unloadStatus = config.isChunkUnloadEnabled() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Chunk Unload", unloadStatus, "CLICK", "Toggle chunk unload management");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "chunkUnload"));
 
-        // Chunk Unload toggle
-        addToggleItem(cmd, events, index++, "Chunk Unload System", config.isChunkUnloadEnabled(),
-                "toggleConfig", "chunkUnload");
+        String protectStatus = config.isChunkProtectionEnabled() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Chunk Protection", protectStatus, "CLICK", "Toggle chunk protection");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "chunkProtection"));
 
-        // Chunk Protection toggle
-        addToggleItem(cmd, events, index++, "Chunk Protection", config.isChunkProtectionEnabled(),
-                "toggleConfig", "chunkProtection");
+        String mapAwareStatus = config.isMapAwareModeEnabled() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Map-Aware Mode", mapAwareStatus, "CLICK", "Toggle map pre-rendering");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "mapAwareMode"));
 
-        // Map-Aware Mode toggle
-        addToggleItem(cmd, events, index++, "Map-Aware Mode", config.isMapAwareModeEnabled(),
-                "toggleConfig", "mapAwareMode");
+        String logSanStatus = config.logSanitizerActions() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Log Sanitizers", logSanStatus, "CLICK", "Toggle sanitizer action logging");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "logSanitizerActions"));
 
-        // Log Sanitizer Actions toggle
-        addToggleItem(cmd, events, index++, "Log Sanitizer Actions", config.logSanitizerActions(),
-                "toggleConfig", "logSanitizerActions");
+        String logChunkStatus = config.logChunkProtectionEvents() ? "ON" : "OFF";
+        index = addPluginItem(cmd, index, "Log Chunk Events", logChunkStatus, "CLICK", "Toggle chunk protection logging");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "toggleConfig").put("Value", "logChunkProtection"));
 
-        // Log Chunk Protection toggle
-        addToggleItem(cmd, events, index++, "Log Chunk Protection", config.logChunkProtectionEvents(),
-                "toggleConfig", "logChunkProtection");
+        // Reload button
+        index = addPluginItem(cmd, index, "RELOAD CONFIG", "", "CLICK", "Reload config.json from disk");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#PluginList[" + (index-1) + "]",
+                EventData.of("Action", "reloadConfig"));
 
-        // Reload Config button
-        addActionButton(cmd, events, index++, "Reload Configuration", "reloadConfig", "",
-                "Reload config.json from disk");
+        // Info
+        String loadedStatus = configManager.isLoadedFromFile() ? "YES" : "NO (defaults)";
+        index = addPluginItem(cmd, index, "Config File", loadedStatus, "INFO", "plugins/hyfixes/config.json");
 
-        // Config file location
-        addStatItem(cmd, index++, "Config Location", "plugins/hyfixes/config.json", COLOR_GRAY);
-        addStatItem(cmd, index++, "Loaded From File", configManager.isLoadedFromFile() ? "YES" : "NO (defaults)",
-                configManager.isLoadedFromFile() ? COLOR_GREEN : COLOR_YELLOW);
+        return index;
     }
 
-    /**
-     * Add a statistic item to the list.
-     */
-    private void addStatItem(UICommandBuilder cmd, int index, String label, String value, String color) {
-        cmd.append("#List", "Pages/ParameterItem.ui");
-        cmd.set("#List[" + index + "] #Label.Text", label);
-        cmd.set("#List[" + index + "] #Value.Text", value);
-        cmd.set("#List[" + index + "] #Value.Style.TextColor", color);
+    private int addContentCard(UICommandBuilder cmd, UIEventBuilder events, int index,
+                               String name, String description, String action) {
+        cmd.append("#SubcommandCards", "Pages/SubcommandCard.ui");
+
+        String cardSelector = "#SubcommandCards[" + index + "]";
+
+        // SubcommandCard uses .Text for label elements
+        cmd.set(cardSelector + " #SubcommandName.Text", name);
+        cmd.set(cardSelector + " #SubcommandDescription.Text", description);
+
+        // Bind click event if action specified
+        if (action != null) {
+            String selector = "#SubcommandCards[" + index + "]";
+            if (action.equals("reloadConfig")) {
+                events.addEventBinding(CustomUIEventBindingType.Activating, selector,
+                        EventData.of("Action", "reloadConfig"));
+            } else if (action.startsWith("toggle_")) {
+                String configKey = action.substring(7);
+                events.addEventBinding(CustomUIEventBindingType.Activating, selector,
+                        EventData.of("Action", "toggleConfig").put("Value", configKey));
+            }
+        }
+
+        return index + 1;
     }
 
-    /**
-     * Add a sanitizer item to the list with name, status, and fix count.
-     */
-    private void addSanitizerItem(UICommandBuilder cmd, int index, String name, String status,
-                                  String statusColor, String detail) {
-        cmd.append("#List", "Pages/SubcommandCard.ui");
-        cmd.set("#List[" + index + "] #Name.Text", name);
-        cmd.set("#List[" + index + "] #Description.Text", detail);
-        cmd.set("#List[" + index + "] #Status.Text", status);
-        cmd.set("#List[" + index + "] #Status.Style.TextColor", statusColor);
+    private int buildOverviewContent(UICommandBuilder cmd, UIEventBuilder events, int index) {
+        DashboardStats stats = DashboardStats.collect();
+
+        index = addContentCard(cmd, events, index,
+                "Crashes Prevented: " + stats.getTotalCrashesPrevented(),
+                "Total server crashes prevented by HyFixes sanitizers", null);
+
+        index = addContentCard(cmd, events, index,
+                "Sanitizers: " + stats.getActiveSanitizers() + "/" + stats.getTotalSanitizers(),
+                "Currently enabled crash prevention systems", null);
+
+        index = addContentCard(cmd, events, index,
+                "Health: " + stats.getHealthStatus(),
+                "Overall system health status", null);
+
+        index = addContentCard(cmd, events, index,
+                "Memory: " + stats.getMemoryUsage(),
+                "Current server memory consumption", null);
+
+        index = addContentCard(cmd, events, index,
+                "Uptime: " + stats.getUptime(),
+                "Time since server started", null);
+
+        index = addContentCard(cmd, events, index,
+                "Protected Chunks: " + stats.getProtectedChunks(),
+                "Chunks protected from unloading", null);
+
+        index = addContentCard(cmd, events, index,
+                "Unload Rate: " + stats.getChunkUnloadRate(),
+                "Chunk unload success rate", null);
+
+        index = addContentCard(cmd, events, index,
+                "Version: " + stats.getPluginVersion(),
+                "Current HyFixes plugin version", null);
+
+        return index;
     }
 
-    /**
-     * Add a toggle item for configuration settings.
-     */
-    private void addToggleItem(UICommandBuilder cmd, UIEventBuilder events, int index,
-                               String label, boolean enabled, String action, String configKey) {
-        String status = enabled ? "[ON]" : "[OFF]";
-        String color = enabled ? COLOR_GREEN : COLOR_RED;
+    private int buildSanitizersContent(UICommandBuilder cmd, UIEventBuilder events, int index) {
+        DashboardStats stats = DashboardStats.collect();
 
-        cmd.append("#List", "Pages/BasicTextButton.ui");
-        cmd.set("#List[" + index + "] #ButtonText.Text", label + ": " + status);
-        cmd.set("#List[" + index + "] #ButtonText.Style.TextColor", color);
+        for (DashboardStats.SanitizerInfo sanitizer : stats.getSanitizerInfos()) {
+            String status = sanitizer.isEnabled() ? "[ON]" : "[OFF]";
+            index = addContentCard(cmd, events, index,
+                    sanitizer.getName() + " " + status,
+                    "Fixes applied: " + sanitizer.getFixCount(), null);
+        }
 
-        // Bind toggle event using EventData
-        String buttonId = "#List[" + index + "] #Button";
-        events.addEventBinding(CustomUIEventBindingType.Activating, buttonId,
-                EventData.of("action", action).put("value", configKey));
+        return index;
     }
 
-    /**
-     * Add an action button.
-     */
-    private void addActionButton(UICommandBuilder cmd, UIEventBuilder events, int index,
-                                 String label, String action, String value, String description) {
-        cmd.append("#List", "Pages/SubcommandCard.ui");
-        cmd.set("#List[" + index + "] #Name.Text", label);
-        cmd.set("#List[" + index + "] #Description.Text", description);
-        cmd.set("#List[" + index + "] #Status.Text", "[Click]");
-        cmd.set("#List[" + index + "] #Status.Style.TextColor", COLOR_GOLD);
+    private int buildChunksContent(UICommandBuilder cmd, UIEventBuilder events, int index) {
+        DashboardStats stats = DashboardStats.collect();
 
-        // Bind action event using EventData
-        String cardId = "#List[" + index + "]";
-        events.addEventBinding(CustomUIEventBindingType.Activating, cardId,
-                EventData.of("action", action).put("value", value));
+        index = addContentCard(cmd, events, index,
+                "Protected: " + stats.getProtectedChunks(),
+                "Number of chunks protected from cleanup", null);
+
+        String protStatus = stats.isChunkProtectionEnabled() ? "ENABLED" : "DISABLED";
+        index = addContentCard(cmd, events, index,
+                "Chunk Protection: " + protStatus,
+                "Prevents important chunks from being unloaded", null);
+
+        String mapStatus = stats.isMapAwareModeEnabled() ? "ENABLED" : "DISABLED";
+        index = addContentCard(cmd, events, index,
+                "Map-Aware Mode: " + mapStatus,
+                "Pre-renders maps before chunk unload", null);
+
+        index = addContentCard(cmd, events, index,
+                "Stats: " + stats.getChunkUnloadAttempts() + " attempts, " + stats.getChunkUnloadSuccesses() + " success",
+                "Success rate: " + stats.getChunkUnloadRate(), null);
+
+        index = addContentCard(cmd, events, index,
+                "Last Cleanup: " + stats.getLastCleanupTime(),
+                "Interval: " + stats.getCleanupInterval() + " ticks", null);
+
+        return index;
+    }
+
+    private int buildConfigContent(UICommandBuilder cmd, UIEventBuilder events, int index) {
+        ConfigManager configManager = ConfigManager.getInstance();
+        HyFixesConfig config = configManager.getConfig();
+
+        // Toggleable options
+        String verboseStatus = config.isVerbose() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Verbose Logging " + verboseStatus,
+                "Click to toggle detailed logging", "toggle_verbose");
+
+        String unloadStatus = config.isChunkUnloadEnabled() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Chunk Unload " + unloadStatus,
+                "Click to toggle chunk unload management", "toggle_chunkUnload");
+
+        String protectStatus = config.isChunkProtectionEnabled() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Chunk Protection " + protectStatus,
+                "Click to toggle chunk protection", "toggle_chunkProtection");
+
+        String mapAwareStatus = config.isMapAwareModeEnabled() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Map-Aware Mode " + mapAwareStatus,
+                "Click to toggle map pre-rendering", "toggle_mapAwareMode");
+
+        String logSanStatus = config.logSanitizerActions() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Log Sanitizers " + logSanStatus,
+                "Click to toggle sanitizer action logging", "toggle_logSanitizerActions");
+
+        String logChunkStatus = config.logChunkProtectionEvents() ? "[ON]" : "[OFF]";
+        index = addContentCard(cmd, events, index,
+                "Log Chunks " + logChunkStatus,
+                "Click to toggle chunk protection logging", "toggle_logChunkProtection");
+
+        // Reload button
+        index = addContentCard(cmd, events, index,
+                "[RELOAD CONFIG]",
+                "Click to reload config.json from disk", "reloadConfig");
+
+        // Info
+        String loadedStatus = configManager.isLoadedFromFile() ? "YES" : "NO (defaults)";
+        index = addContentCard(cmd, events, index,
+                "Config: plugins/hyfixes/config.json",
+                "Loaded from file: " + loadedStatus, null);
+
+        return index;
     }
 
     @Override
@@ -312,9 +408,6 @@ public class HyFixesDashboardPage extends InteractiveCustomUIPage<DashboardEvent
         }
     }
 
-    /**
-     * Toggle a configuration setting and save to config.json.
-     */
     private void toggleConfigSetting(String configKey) {
         ConfigManager configManager = ConfigManager.getInstance();
         HyFixesConfig config = configManager.getConfig();
@@ -328,13 +421,9 @@ public class HyFixesDashboardPage extends InteractiveCustomUIPage<DashboardEvent
             case "logChunkProtection" -> config.setLogChunkProtectionEvents(!config.logChunkProtectionEvents());
         }
 
-        // Save configuration
         configManager.saveConfig();
     }
 
-    /**
-     * Send a notification message to the player.
-     */
     private void notifyPlayer(Ref<EntityStore> ref, Store<EntityStore> store, String message) {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player != null) {

@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
+import com.hyfixes.util.ChatColorUtil;
 
 /**
  * Command: /chunkstatus
@@ -82,8 +83,6 @@ public class ChunkStatusCommand extends AbstractPlayerCommand {
     }
 
     private void sendMessage(Player player, String message) {
-        // Convert color codes
-        String formatted = message.replace("&", "\u00A7");
-        player.sendMessage(Message.raw(formatted));
+        ChatColorUtil.sendMessage(player, message);
     }
 }

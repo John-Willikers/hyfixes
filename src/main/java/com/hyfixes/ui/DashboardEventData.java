@@ -13,8 +13,8 @@ import com.hypixel.hytale.codec.codecs.simple.StringCodec;
  */
 public class DashboardEventData {
 
-    private static final KeyedCodec<String> ACTION_CODEC = new KeyedCodec<>("action", new StringCodec());
-    private static final KeyedCodec<String> VALUE_CODEC = new KeyedCodec<>("value", new StringCodec());
+    private static final KeyedCodec<String> ACTION_CODEC = new KeyedCodec<>("Action", new StringCodec());
+    private static final KeyedCodec<String> VALUE_CODEC = new KeyedCodec<>("Value", new StringCodec());
 
     /**
      * The action to perform (e.g., "selectTab", "refresh", "toggleConfig", "reloadConfig")

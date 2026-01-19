@@ -6,9 +6,12 @@ import com.hyfixes.util.ReflectionHelper;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 
+import com.hypixel.hytale.math.util.ChunkUtil;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -70,6 +73,11 @@ public class ChunkUnloadManager {
     
     // Reference to chunk protection registry
     private ChunkProtectionRegistry protectionRegistry = null;
+
+    // Map-aware chunk manager for BetterMaps compatibility
+    private MapAwareChunkManager mapAwareManager = null;
+    private boolean mapAwareMode = false;
+    private boolean mapAwareModeRequested = false; // Set to true when config requests map-aware mode
 
     // Keywords that suggest cleanup/release functionality
     private static final String[] CLEANUP_KEYWORDS = {
@@ -145,6 +153,59 @@ public class ChunkUnloadManager {
     }
 
     /**
+     * Enable map-aware mode for BetterMaps compatibility.
+     * When enabled, map images are pre-rendered before chunks are unloaded.
+     * This ensures the map system has the data it needs even after chunk data is freed.
+     */
+    public void enableMapAwareMode(World world) {
+        this.mapAwareManager = new MapAwareChunkManager(plugin);
+        if (mapAwareManager.initialize(world)) {
+            this.mapAwareMode = true;
+            plugin.getLogger().at(Level.INFO).log(
+                "[ChunkUnloadManager] Map-Aware Mode ENABLED - BetterMaps compatible!"
+            );
+            plugin.getLogger().at(Level.INFO).log(
+                "[ChunkUnloadManager] Map images will be pre-rendered before chunk unload"
+            );
+        } else {
+            plugin.getLogger().at(Level.WARNING).log(
+                "[ChunkUnloadManager] Failed to enable Map-Aware Mode - WorldMapManager not accessible"
+            );
+            this.mapAwareManager = null;
+            this.mapAwareMode = false;
+        }
+    }
+
+    /**
+     * Check if map-aware mode is enabled.
+     */
+    public boolean isMapAwareModeEnabled() {
+        return mapAwareMode && mapAwareManager != null;
+    }
+
+    /**
+     * Get the MapAwareChunkManager instance (for status reporting).
+     */
+    public MapAwareChunkManager getMapAwareManager() {
+        return mapAwareManager;
+    }
+
+    /**
+     * Mark that map-aware mode was requested from config.
+     * The manager will retry enabling it when the world becomes available.
+     */
+    public void setMapAwareModeRequested(boolean requested) {
+        this.mapAwareModeRequested = requested;
+    }
+
+    /**
+     * Check if map-aware mode was requested but not yet enabled.
+     */
+    public boolean isMapAwareModeRequested() {
+        return mapAwareModeRequested;
+    }
+
+    /**
      * Stop the chunk unload manager.
      */
     public void stop() {
@@ -189,6 +250,18 @@ public class ChunkUnloadManager {
             World world = getDefaultWorld();
             if (world == null) {
                 return;
+            }
+
+            // Retry map-aware mode initialization if requested but not yet enabled
+            if (mapAwareModeRequested && !mapAwareMode) {
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkUnloadManager] Retrying Map-Aware mode initialization..."
+                );
+                enableMapAwareMode(world);
+                if (mapAwareMode) {
+                    // Successfully enabled on retry - clear the request flag
+                    mapAwareModeRequested = false;
+                }
             }
 
             // Try all aggressive unload strategies
@@ -457,10 +530,47 @@ public class ChunkUnloadManager {
      * AGGRESSIVE unload attempt - try everything we found.
      * Note: Direct calls to invalidateLoadedChunks/waitForLoadingChunks are now
      * handled by ChunkCleanupSystem on the MAIN THREAD to avoid InvocationTargetException.
+     *
+     * MAP-AWARE MODE (v1.8.0+):
+     * When enabled, pre-renders map images for chunks before unloading to ensure
+     * BetterMaps and the vanilla map system have the data they need.
      */
     private void attemptAggressiveUnload(World world) {
         totalUnloadAttempts.incrementAndGet();
         int callCount = 0;
+
+        // MAP-AWARE MODE: Pre-render map images before cleanup
+        if (mapAwareMode && mapAwareManager != null) {
+            try {
+                Set<Long> chunksToProcess = getLoadedChunkIndexes();
+                if (!chunksToProcess.isEmpty()) {
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[ChunkUnloadManager] Map-Aware: Pre-rendering %d chunk map images...",
+                        chunksToProcess.size()
+                    );
+
+                    // Trigger async map generation and wait (with timeout)
+                    mapAwareManager.prepareChunksForUnload(chunksToProcess)
+                        .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .exceptionally(ex -> {
+                            plugin.getLogger().at(Level.WARNING).log(
+                                "[ChunkUnloadManager] Map pre-render timeout/error: %s",
+                                ex.getMessage()
+                            );
+                            return null;
+                        })
+                        .join(); // Wait for completion
+
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[ChunkUnloadManager] Map-Aware: Pre-render complete, proceeding with cleanup"
+                    );
+                }
+            } catch (Exception e) {
+                plugin.getLogger().at(Level.WARNING).log(
+                    "[ChunkUnloadManager] Map-Aware pre-render error: %s", e.getMessage()
+                );
+            }
+        }
 
         // Strategy 0: (MOVED TO MAIN THREAD) Direct calls now handled by ChunkCleanupSystem
         // The ChunkCleanupSystem ticks on the main server thread and calls
@@ -627,6 +737,82 @@ public class ChunkUnloadManager {
     }
 
     /**
+     * Get all currently loaded chunk indexes from ChunkStore.
+     * Used by Map-Aware mode to identify chunks that need map pre-rendering.
+     *
+     * @return Set of chunk indexes, or empty set if unable to retrieve
+     */
+    @SuppressWarnings("unchecked")
+    private Set<Long> getLoadedChunkIndexes() {
+        Set<Long> result = new HashSet<>();
+
+        if (getChunkIndexesMethod == null || chunkStoreInstance == null) {
+            return result;
+        }
+
+        try {
+            Object indexes = getChunkIndexesMethod.invoke(chunkStoreInstance);
+            if (indexes == null) {
+                return result;
+            }
+
+            // Handle different collection types
+            if (indexes instanceof Collection) {
+                for (Object idx : (Collection<?>) indexes) {
+                    if (idx instanceof Long) {
+                        result.add((Long) idx);
+                    } else if (idx instanceof Number) {
+                        result.add(((Number) idx).longValue());
+                    }
+                }
+            } else if (indexes.getClass().isArray()) {
+                int len = java.lang.reflect.Array.getLength(indexes);
+                for (int i = 0; i < len; i++) {
+                    Object idx = java.lang.reflect.Array.get(indexes, i);
+                    if (idx instanceof Long) {
+                        result.add((Long) idx);
+                    } else if (idx instanceof Number) {
+                        result.add(((Number) idx).longValue());
+                    }
+                }
+            } else {
+                // Try to iterate using forEach or iterator
+                try {
+                    Method forEachMethod = indexes.getClass().getMethod("forEach", java.util.function.Consumer.class);
+                    forEachMethod.invoke(indexes, (java.util.function.LongConsumer) result::add);
+                } catch (Exception e) {
+                    // Try toArray
+                    try {
+                        Method toArrayMethod = indexes.getClass().getMethod("toLongArray");
+                        long[] arr = (long[]) toArrayMethod.invoke(indexes);
+                        for (long idx : arr) {
+                            result.add(idx);
+                        }
+                    } catch (Exception e2) {
+                        plugin.getLogger().at(Level.FINE).log(
+                            "[ChunkUnloadManager] Could not iterate chunk indexes: %s",
+                            e2.getMessage()
+                        );
+                    }
+                }
+            }
+
+            // Filter out protected chunks
+            if (protectionRegistry != null) {
+                result.removeIf(protectionRegistry::isChunkProtected);
+            }
+
+        } catch (Exception e) {
+            plugin.getLogger().at(Level.FINE).log(
+                "[ChunkUnloadManager] Error getting chunk indexes: %s",
+                e.getMessage()
+            );
+        }
+
+        return result;
+    }
+
+    /**
      * Get the appropriate target object for invoking a method.
      * More aggressive matching - try both instances if method might work.
      */
@@ -707,14 +893,20 @@ public class ChunkUnloadManager {
         String lastRunStr = lastRun > 0 ?
             ((System.currentTimeMillis() - lastRun) / 1000) + "s ago" :
             "never";
-            
+
         String protectionStatus = "disabled";
         if (protectionRegistry != null) {
             protectionStatus = protectionRegistry.getProtectedChunkCount() + " chunks protected";
         }
 
-        return String.format(
-            "ChunkUnloadManager Status (AGGRESSIVE v1.2.1):\n" +
+        String mapAwareStatus = "DISABLED";
+        if (mapAwareMode && mapAwareManager != null) {
+            mapAwareStatus = "ENABLED (BetterMaps compatible)";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(
+            "ChunkUnloadManager Status (v1.8.0):\n" +
             "  API Discovered: %s\n" +
             "  ChunkStore Found: %s\n" +
             "  ChunkLighting Found: %s\n" +
@@ -722,7 +914,8 @@ public class ChunkUnloadManager {
             "  Total Attempts: %d\n" +
             "  Methods Called: %d\n" +
             "  Last Run: %s\n" +
-            "  Chunk Protection: %s",
+            "  Chunk Protection: %s\n" +
+            "  Map-Aware Mode: %s",
             apiDiscovered,
             chunkStoreInstance != null,
             chunkLightingInstance != null,
@@ -730,8 +923,16 @@ public class ChunkUnloadManager {
             totalUnloadAttempts.get(),
             methodsCalled.get(),
             lastRunStr,
-            protectionStatus
-        );
+            protectionStatus,
+            mapAwareStatus
+        ));
+
+        // Add MapAwareChunkManager details if enabled
+        if (mapAwareMode && mapAwareManager != null) {
+            sb.append("\n\n").append(mapAwareManager.getStatus());
+        }
+
+        return sb.toString();
     }
 
     /**

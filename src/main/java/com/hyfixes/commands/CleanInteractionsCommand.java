@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.Message;
+import com.hyfixes.util.ChatColorUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -1111,7 +1112,6 @@ public class CleanInteractionsCommand extends AbstractPlayerCommand {
     }
 
     private void sendMessage(Player player, String message) {
-        String formatted = message.replace("&", "\u00A7");
-        player.sendMessage(Message.raw(formatted));
+        ChatColorUtil.sendMessage(player, message);
     }
 }
