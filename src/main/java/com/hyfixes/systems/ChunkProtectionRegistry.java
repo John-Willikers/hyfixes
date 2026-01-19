@@ -210,22 +210,94 @@ public class ChunkProtectionRegistry {
         if (protectedChunks.isEmpty()) {
             return "No protected chunks.";
         }
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("Protected chunks (").append(protectedChunks.size()).append(" total):\n");
-        
+
         int shown = 0;
         for (Map.Entry<Long, ProtectionInfo> entry : protectedChunks.entrySet()) {
-            if (shown >= 50) {
-                sb.append("... and ").append(protectedChunks.size() - 50).append(" more\n");
+            if (shown >= 20) {
+                sb.append("... and ").append(protectedChunks.size() - 20).append(" more\n");
                 break;
             }
             ProtectionInfo info = entry.getValue();
-            sb.append(String.format("  Chunk %d: %s (verified tick %d)\n", 
-                entry.getKey(), info.reason, info.lastVerifiedAtTick));
+
+            // Convert packed chunk index to X/Z coordinates
+            int chunkX = (int) (info.chunkIndex >> 32);
+            int chunkZ = (int) info.chunkIndex;
+
+            // Convert chunk coords to world coords (center of chunk)
+            int worldX = (chunkX << 4) + 8;
+            int worldZ = (chunkZ << 4) + 8;
+
+            sb.append(String.format("  [%d, %d] (world ~%d, ~%d) - %s\n",
+                chunkX, chunkZ, worldX, worldZ, info.reason));
             shown++;
         }
-        
+
+        return sb.toString();
+    }
+
+    /**
+     * Get detailed protection info for admin commands.
+     * Shows what's being protected and why.
+     */
+    public String getProtectedChunksDetailed(int maxEntries) {
+        if (protectedChunks.isEmpty()) {
+            return "No protected chunks.";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("§6Protected Chunks (").append(protectedChunks.size()).append(" total):\n");
+
+        // Group by reason for better readability
+        java.util.Map<String, java.util.List<long[]>> byReason = new java.util.HashMap<>();
+
+        for (Map.Entry<Long, ProtectionInfo> entry : protectedChunks.entrySet()) {
+            ProtectionInfo info = entry.getValue();
+            String reason = info.reason;
+
+            // Simplify reason for grouping
+            String groupKey = reason;
+            if (reason.startsWith("Entity: ")) {
+                groupKey = reason;
+            } else if (reason.startsWith("Block: ")) {
+                groupKey = reason;
+            }
+
+            byReason.computeIfAbsent(groupKey, k -> new java.util.ArrayList<>())
+                .add(new long[] { info.chunkIndex });
+        }
+
+        int shown = 0;
+        for (Map.Entry<String, java.util.List<long[]>> entry : byReason.entrySet()) {
+            if (shown >= maxEntries) {
+                sb.append("§7... and more groups\n");
+                break;
+            }
+
+            String reason = entry.getKey();
+            java.util.List<long[]> chunks = entry.getValue();
+
+            sb.append("§e").append(reason).append(" §7(").append(chunks.size()).append(" chunks):\n");
+
+            int chunkShown = 0;
+            for (long[] chunkData : chunks) {
+                if (chunkShown >= 5) {
+                    sb.append("  §7... and ").append(chunks.size() - 5).append(" more\n");
+                    break;
+                }
+                long chunkIndex = chunkData[0];
+                int chunkX = (int) (chunkIndex >> 32);
+                int chunkZ = (int) chunkIndex;
+                int worldX = (chunkX << 4) + 8;
+                int worldZ = (chunkZ << 4) + 8;
+                sb.append(String.format("  §7[%d, %d] (tp: /tp %d ~ %d)\n", chunkX, chunkZ, worldX, worldZ));
+                chunkShown++;
+            }
+            shown++;
+        }
+
         return sb.toString();
     }
 }

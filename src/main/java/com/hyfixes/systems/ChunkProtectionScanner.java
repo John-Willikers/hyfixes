@@ -3,59 +3,62 @@ package com.hyfixes.systems;
 import com.hyfixes.HyFixes;
 import com.hyfixes.config.ConfigManager;
 import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.logging.Level;
 
 /**
  * ChunkProtectionScanner - Scans chunks for protected content.
- * 
- * Uses reflection patterns from CleanWarpsCommand to detect:
- * - Entities with archetypes matching protected keywords (teleporters, portals, etc.)
- * - Blocks with types matching protected keywords
- * 
- * Caches reflection handles for performance.
+ *
+ * Uses the Hytale TeleporterPlugin API to detect teleporters/portals in the ChunkStore.
+ * Teleporters are stored as Components in ChunkStore, not EntityStore.
+ *
+ * Key API calls:
+ * - TeleporterPlugin.get().getTeleporterComponentType() - get the teleporter component type
+ * - world.getChunkStore().getStore().forEachChunk(componentType, ...) - iterate chunks with teleporters
+ * - Teleporter.getTransform().getPosition() - get position of a teleporter
  */
 public class ChunkProtectionScanner {
 
     private final HyFixes plugin;
     private final ChunkProtectionRegistry registry;
-    
+
     // Cached reflection handles (initialized lazily)
     private volatile boolean reflectionInitialized = false;
+    private volatile boolean teleporterPluginAvailable = false;
+
+    // TeleporterPlugin reflection
+    private Object teleporterPlugin;
     @SuppressWarnings("rawtypes")
-    private ComponentType transformComponentType;
-    private Method forEachChunkMethod;
-    private Method getArchetypeMethod;
-    private Method getPositionMethod;
-    private Method getPosXMethod;
-    private Method getPosYMethod;
-    private Method getPosZMethod;
-    private Field refsField;
-    
+    private ComponentType teleporterComponentType;
+    private Method forEachChunkSimpleMethod;  // 1-param: forEachChunk(BiPredicate)
+    private Method forEachChunkFilteredMethod; // 2-param: forEachChunk(ComponentType, BiConsumer)
+
     // Scan statistics
     private volatile int totalScans = 0;
-    private volatile int entitiesScanned = 0;
+    private volatile int teleportersScanned = 0;
     private volatile int protectedFound = 0;
-    
+
     public ChunkProtectionScanner(HyFixes plugin, ChunkProtectionRegistry registry) {
         this.plugin = plugin;
         this.registry = registry;
     }
-    
+
     /**
      * Scan a world for protected content and update the registry.
-     * 
+     *
      * @param world The world to scan
      * @param currentTick The current server tick (for protection timestamps)
      * @return The number of chunks newly protected
@@ -64,224 +67,419 @@ public class ChunkProtectionScanner {
         if (!ConfigManager.getInstance().isChunkProtectionEnabled()) {
             return 0;
         }
-        
+
         if (world == null) {
             return 0;
         }
-        
+
         totalScans++;
         int newlyProtected = 0;
-        
+
         try {
-            Store<EntityStore> store = world.getEntityStore().getStore();
+            // Get the ChunkStore (NOT EntityStore - teleporters are in ChunkStore!)
+            ChunkStore chunkStore = world.getChunkStore();
+            if (chunkStore == null) {
+                return 0;
+            }
+
+            Store<ChunkStore> store = chunkStore.getStore();
             if (store == null) {
                 return 0;
             }
-            
+
             // Initialize reflection handles if needed
             if (!reflectionInitialized) {
                 initializeReflection(store);
             }
-            
-            // Get keywords from config
-            String[] entityKeywords = ConfigManager.getInstance().getProtectedEntityKeywords();
-            String[] blockKeywords = ConfigManager.getInstance().getProtectedBlockKeywords();
-            
-            // Track chunks we've found protected content in
-            Set<Long> protectedChunkIndexes = new HashSet<>();
-            
-            // Scan entities using forEachChunk pattern
-            if (forEachChunkMethod != null) {
-                newlyProtected += scanEntities(store, entityKeywords, currentTick, protectedChunkIndexes);
+
+            // Scan for teleporters if plugin is available
+            if (teleporterPluginAvailable && teleporterComponentType != null) {
+                newlyProtected += scanTeleporters(store, currentTick);
             }
-            
-            // Block scanning is expensive - only do it sparingly
-            // The entity scan should catch most cases since teleporters are entities
-            
+
         } catch (Exception e) {
             plugin.getLogger().at(Level.WARNING).log(
                 "[ChunkProtectionScanner] Scan error: %s", e.getMessage()
             );
         }
-        
+
         return newlyProtected;
     }
-    
+
     /**
-     * Scan entities in all chunks for protected content.
+     * Scan for teleporter components in the ChunkStore.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private int scanEntities(Store<EntityStore> store, String[] keywords, long currentTick, Set<Long> protectedIndexes) {
-        int newlyProtected = 0;
-        
-        if (forEachChunkMethod == null) {
-            return 0;
-        }
-        
+    private int scanTeleporters(Store<ChunkStore> store, long currentTick) {
+        final int[] protectedCount = {0};
+        final int[] scannedCount = {0};
+        final int[] fallbackCount = {0};
+        final int[] chunksScanned = {0};
+        Set<Long> protectedChunks = new HashSet<>();
+
         try {
-            Class<?> consumerType = forEachChunkMethod.getParameterTypes()[0];
-            final int[] scannedCount = {0};
-            final int[] protectedCount = {0};
-            
-            Object consumer = java.lang.reflect.Proxy.newProxyInstance(
-                consumerType.getClassLoader(),
-                new Class<?>[] { consumerType },
-                (proxy, method, args) -> {
-                    if (method.getName().equals("accept")) {
-                        ArchetypeChunk chunk = (ArchetypeChunk) args[0];
-                        scannedCount[0]++;
-                        
-                        // Process entities in this chunk
-                        try {
-                            if (refsField == null) {
-                                refsField = chunk.getClass().getDeclaredField("refs");
-                                refsField.setAccessible(true);
-                            }
-                            
-                            Object refs = refsField.get(chunk);
-                            if (refs != null && refs.getClass().isArray()) {
-                                Object[] refArray = (Object[]) refs;
-                                
-                                for (Object refObj : refArray) {
-                                    if (refObj instanceof Ref) {
-                                        Ref<EntityStore> entityRef = (Ref<EntityStore>) refObj;
-                                        entitiesScanned++;
-                                        
-                                        // Check if entity matches protected keywords
-                                        String archetype = getEntityArchetype(store, entityRef);
-                                        if (archetype != null && matchesKeywords(archetype, keywords)) {
-                                            // Get entity position to determine chunk
-                                            long chunkIndex = getEntityChunkIndex(store, entityRef);
-                                            if (chunkIndex != -1 && !protectedIndexes.contains(chunkIndex)) {
-                                                if (registry.protectChunk(chunkIndex, "Entity: " + archetype, currentTick)) {
-                                                    protectedCount[0]++;
-                                                    protectedIndexes.add(chunkIndex);
-                                                    protectedFound++;
-                                                }
-                                            }
-                                        }
+            // Consumer/handler for processing teleporter chunks
+            java.util.function.BiConsumer<ArchetypeChunk<ChunkStore>, CommandBuffer<ChunkStore>> handler =
+                (chunk, commandBuffer) -> {
+                    try {
+                        chunksScanned[0]++;
+                        int chunkSize = chunk.size();
+
+                        for (int i = 0; i < chunkSize; i++) {
+                            Object teleporter = chunk.getComponent(i, teleporterComponentType);
+
+                            if (teleporter != null) {
+                                scannedCount[0]++;
+                                teleportersScanned++;
+
+                                // Try to get chunk index from teleporter's transform
+                                long chunkIndex = getTeleporterChunkIndex(teleporter);
+
+                                // Fallback: try to get from Ref
+                                if (chunkIndex == -1) {
+                                    chunkIndex = getChunkIndexFromRef(chunk, i);
+                                }
+
+                                // Last resort: dump teleporter info and use fallback
+                                if (chunkIndex == -1) {
+                                    // Log verbose info about this teleporter for debugging
+                                    if (fallbackCount[0] < 3) {
+                                        logTeleporterDebugInfo(teleporter, chunk, i);
+                                    }
+                                    chunkIndex = 0xDEAD0000L | (fallbackCount[0]++ & 0xFFFF);
+                                    plugin.getLogger().at(Level.INFO).log(
+                                        "[ChunkProtectionScanner] Using fallback chunk index 0x%X for teleporter #%d",
+                                        chunkIndex, fallbackCount[0]
+                                    );
+                                }
+
+                                if (!protectedChunks.contains(chunkIndex)) {
+                                    String warpName = getTeleporterWarpName(teleporter);
+                                    String reason = "Teleporter" + (warpName != null ? ": " + warpName : "");
+
+                                    if (registry.protectChunk(chunkIndex, reason, currentTick)) {
+                                        protectedCount[0]++;
+                                        protectedChunks.add(chunkIndex);
+                                        protectedFound++;
                                     }
                                 }
                             }
-                        } catch (NoSuchFieldException e) {
-                            // refs field not found - this chunk type doesn't have it
-                        } catch (Exception e) {
-                            // Skip this chunk on error
                         }
+                    } catch (Exception e) {
+                        // Skip this chunk on error
                     }
-                    return null;
-                }
-            );
-            
-            forEachChunkMethod.invoke(store, consumer);
-            newlyProtected = protectedCount[0];
-            
+                };
+
+            // PRIMARY: Use filtered 2-param method - ComponentType implements Query, so pass it directly
+            if (forEachChunkFilteredMethod != null && teleporterComponentType != null) {
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] Using filtered forEachChunk with ComponentType (implements Query)"
+                );
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] Method: %s", forEachChunkFilteredMethod.toGenericString()
+                );
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] ComponentType: %s (class: %s)",
+                    teleporterComponentType, teleporterComponentType.getClass().getName()
+                );
+
+                // ComponentType implements Query<ECS_TYPE>, so we can pass it directly
+                forEachChunkFilteredMethod.invoke(store, teleporterComponentType, handler);
+
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] Scanned %d archetype chunks, found %d teleporters",
+                    chunksScanned[0], scannedCount[0]
+                );
+            }
+
+            // FALLBACK: Use simple 1-param method if filtered didn't work or find teleporters
+            if (scannedCount[0] == 0 && forEachChunkSimpleMethod != null) {
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] Using simple forEachChunk (fallback)"
+                );
+                BiPredicate<ArchetypeChunk<ChunkStore>, CommandBuffer<ChunkStore>> predicate =
+                    (chunk, commandBuffer) -> {
+                        handler.accept(chunk, commandBuffer);
+                        return true; // Continue iterating
+                    };
+                forEachChunkSimpleMethod.invoke(store, predicate);
+
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkProtectionScanner] Fallback scanned %d archetype chunks, found %d teleporters",
+                    chunksScanned[0], scannedCount[0]
+                );
+            }
+
+            if (scannedCount[0] == 0 && forEachChunkFilteredMethod == null && forEachChunkSimpleMethod == null) {
+                plugin.getLogger().at(Level.WARNING).log(
+                    "[ChunkProtectionScanner] No forEachChunk method available!"
+                );
+            }
+
             if (ConfigManager.getInstance().logChunkProtectionEvents() && protectedCount[0] > 0) {
                 plugin.getLogger().at(Level.INFO).log(
-                    "[ChunkProtectionScanner] Scanned %d chunks, found %d protected entities",
+                    "[ChunkProtectionScanner] Found %d teleporters, protected %d new chunks",
                     scannedCount[0], protectedCount[0]
                 );
             }
-            
+
         } catch (Exception e) {
             plugin.getLogger().at(Level.WARNING).log(
-                "[ChunkProtectionScanner] Entity scan error: %s", e.getMessage()
+                "[ChunkProtectionScanner] Teleporter scan error: %s", e.getMessage()
             );
         }
-        
-        return newlyProtected;
+
+        return protectedCount[0];
     }
-    
+
     /**
-     * Get the archetype name for an entity.
+     * Try to get chunk index from the Ref in the ArchetypeChunk.
+     * ChunkStore Refs might encode position information.
      */
-    @SuppressWarnings("unchecked")
-    private String getEntityArchetype(Store<EntityStore> store, Ref<EntityStore> entityRef) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private long getChunkIndexFromRef(ArchetypeChunk<ChunkStore> chunk, int index) {
         try {
-            if (getArchetypeMethod == null) {
-                // Find archetype method
-                for (Method m : store.getClass().getMethods()) {
-                    if (m.getName().contains("Archetype") && m.getParameterCount() == 1) {
-                        getArchetypeMethod = m;
-                        break;
+            // Get the Ref for this entity
+            Ref<ChunkStore> ref = chunk.getReferenceTo(index);
+            if (ref == null) {
+                return -1;
+            }
+
+            // Try to get chunk position from the Ref
+            // Refs often have an index or ID that encodes position
+
+            // Try getIndex() method
+            try {
+                Method getIndex = ref.getClass().getMethod("getIndex");
+                Object indexVal = getIndex.invoke(ref);
+                if (indexVal instanceof Number) {
+                    return ((Number) indexVal).longValue();
+                }
+            } catch (NoSuchMethodException ignored) {}
+
+            // Try getChunkIndex() method
+            try {
+                Method getChunkIndex = ref.getClass().getMethod("getChunkIndex");
+                Object chunkIdx = getChunkIndex.invoke(ref);
+                if (chunkIdx instanceof Number) {
+                    return ((Number) chunkIdx).longValue();
+                }
+            } catch (NoSuchMethodException ignored) {}
+
+            // Try getId() method
+            try {
+                Method getId = ref.getClass().getMethod("getId");
+                Object id = getId.invoke(ref);
+                if (id instanceof Number) {
+                    return ((Number) id).longValue();
+                }
+            } catch (NoSuchMethodException ignored) {}
+
+            // Try to parse the Ref's toString for position info
+            String refStr = ref.toString();
+            // Look for patterns like "chunk=123" or "index=456"
+            if (refStr.contains("chunk=")) {
+                int start = refStr.indexOf("chunk=") + 6;
+                int end = refStr.indexOf(",", start);
+                if (end == -1) end = refStr.indexOf("]", start);
+                if (end == -1) end = refStr.indexOf(")", start);
+                if (end > start) {
+                    try {
+                        return Long.parseLong(refStr.substring(start, end).trim());
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+        } catch (Exception e) {
+            // Failed to get chunk index from ref
+        }
+        return -1;
+    }
+
+    /**
+     * Get the chunk index from a Teleporter component's position.
+     * Tries multiple approaches to find position data.
+     */
+    private long getTeleporterChunkIndex(Object teleporter) {
+        Vector3d pos = null;
+
+        // Method 1: Try getTransform().getPosition()
+        try {
+            Method getTransform = teleporter.getClass().getMethod("getTransform");
+            Transform transform = (Transform) getTransform.invoke(teleporter);
+            if (transform != null) {
+                pos = transform.getPosition();
+            }
+        } catch (Exception ignored) {}
+
+        // Method 2: Try getPosition() directly
+        if (pos == null) {
+            try {
+                Method getPosition = teleporter.getClass().getMethod("getPosition");
+                Object result = getPosition.invoke(teleporter);
+                if (result instanceof Vector3d) {
+                    pos = (Vector3d) result;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Method 3: Try getOrigin()
+        if (pos == null) {
+            try {
+                Method getOrigin = teleporter.getClass().getMethod("getOrigin");
+                Object result = getOrigin.invoke(teleporter);
+                if (result instanceof Vector3d) {
+                    pos = (Vector3d) result;
+                } else if (result instanceof Transform) {
+                    pos = ((Transform) result).getPosition();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Method 4: Try getDestination() - might have location
+        if (pos == null) {
+            try {
+                Method getDest = teleporter.getClass().getMethod("getDestination");
+                Object dest = getDest.invoke(teleporter);
+                if (dest != null) {
+                    // Try to get position from destination
+                    try {
+                        Method destGetPos = dest.getClass().getMethod("getPosition");
+                        Object destPos = destGetPos.invoke(dest);
+                        if (destPos instanceof Vector3d) {
+                            pos = (Vector3d) destPos;
+                        }
+                    } catch (Exception ignored) {}
+                    // Try getTransform on destination
+                    try {
+                        Method destGetTransform = dest.getClass().getMethod("getTransform");
+                        Transform destTransform = (Transform) destGetTransform.invoke(dest);
+                        if (destTransform != null) {
+                            pos = destTransform.getPosition();
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Method 5: Try getWarp() and get location from warp
+        if (pos == null) {
+            try {
+                Method getWarp = teleporter.getClass().getMethod("getWarp");
+                Object warp = getWarp.invoke(teleporter);
+                if (warp != null) {
+                    // Try warp.getPosition()
+                    try {
+                        Method warpGetPos = warp.getClass().getMethod("getPosition");
+                        Object warpPos = warpGetPos.invoke(warp);
+                        if (warpPos instanceof Vector3d) {
+                            pos = (Vector3d) warpPos;
+                        }
+                    } catch (Exception ignored) {}
+                    // Try warp.getTransform()
+                    try {
+                        Method warpGetTransform = warp.getClass().getMethod("getTransform");
+                        Transform warpTransform = (Transform) warpGetTransform.invoke(warp);
+                        if (warpTransform != null) {
+                            pos = warpTransform.getPosition();
+                        }
+                    } catch (Exception ignored) {}
+                    // Try warp.getLocation()
+                    try {
+                        Method warpGetLoc = warp.getClass().getMethod("getLocation");
+                        Object loc = warpGetLoc.invoke(warp);
+                        if (loc instanceof Vector3d) {
+                            pos = (Vector3d) loc;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Method 6: Try any field that might be a Vector3d position
+        if (pos == null) {
+            try {
+                for (java.lang.reflect.Field field : teleporter.getClass().getDeclaredFields()) {
+                    if (field.getType() == Vector3d.class ||
+                        field.getName().toLowerCase().contains("pos") ||
+                        field.getName().toLowerCase().contains("location")) {
+                        field.setAccessible(true);
+                        Object value = field.get(teleporter);
+                        if (value instanceof Vector3d) {
+                            pos = (Vector3d) value;
+                            break;
+                        }
                     }
                 }
-            }
-            
-            if (getArchetypeMethod != null) {
-                Object archetype = getArchetypeMethod.invoke(store, entityRef);
-                if (archetype != null) {
-                    return archetype.toString();
-                }
-            }
-            
-            // Fallback to entityRef string
-            return entityRef.toString();
-        } catch (Exception e) {
-            return null;
+            } catch (Exception ignored) {}
         }
-    }
-    
-    /**
-     * Get the chunk index for an entity based on its position.
-     */
-    private long getEntityChunkIndex(Store<EntityStore> store, Ref<EntityStore> entityRef) {
-        try {
-            if (transformComponentType == null) {
-                transformComponentType = TransformComponent.getComponentType();
-            }
-            
-            @SuppressWarnings("unchecked")
-            TransformComponent transform = (TransformComponent) store.getComponent(entityRef, transformComponentType);
-            if (transform == null) {
-                return -1;
-            }
-            
-            // Get position
-            Object pos;
-            if (getPositionMethod == null) {
-                getPositionMethod = transform.getClass().getMethod("getPosition");
-            }
-            pos = getPositionMethod.invoke(transform);
-            if (pos == null) {
-                return -1;
-            }
-            
-            // Get coordinates
-            float x, y, z;
-            try {
-                if (getPosXMethod == null) {
-                    getPosXMethod = pos.getClass().getMethod("getX");
-                    getPosYMethod = pos.getClass().getMethod("getY");
-                    getPosZMethod = pos.getClass().getMethod("getZ");
-                }
-                x = ((Number) getPosXMethod.invoke(pos)).floatValue();
-                y = ((Number) getPosYMethod.invoke(pos)).floatValue();
-                z = ((Number) getPosZMethod.invoke(pos)).floatValue();
-            } catch (NoSuchMethodException e) {
-                // Try x(), y(), z() methods
-                Method xm = pos.getClass().getMethod("x");
-                Method ym = pos.getClass().getMethod("y");
-                Method zm = pos.getClass().getMethod("z");
-                x = ((Number) xm.invoke(pos)).floatValue();
-                y = ((Number) ym.invoke(pos)).floatValue();
-                z = ((Number) zm.invoke(pos)).floatValue();
-            }
-            
-            // Convert world position to chunk index
-            // Chunks are typically 16x16 blocks horizontally
-            // Chunk index is usually packed as (chunkX, chunkZ) or similar
-            int chunkX = (int) Math.floor(x) >> 4; // Divide by 16
-            int chunkZ = (int) Math.floor(z) >> 4;
-            
-            // Pack into a long (common pattern: upper 32 bits = x, lower 32 bits = z)
+
+        if (pos != null) {
+            // Convert to chunk coordinates
+            int chunkX = (int) Math.floor(pos.getX()) >> 4;
+            int chunkZ = (int) Math.floor(pos.getZ()) >> 4;
             return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
-            
-        } catch (Exception e) {
-            return -1;
         }
+
+        return -1;
     }
-    
+
+    /**
+     * Get the warp name from a Teleporter component.
+     */
+    private String getTeleporterWarpName(Object teleporter) {
+        try {
+            // Try getWarp() first
+            Method getWarp = teleporter.getClass().getMethod("getWarp");
+            Object warp = getWarp.invoke(teleporter);
+            if (warp != null && !warp.toString().isEmpty()) {
+                return warp.toString();
+            }
+
+            // Try getOwnedWarp()
+            Method getOwnedWarp = teleporter.getClass().getMethod("getOwnedWarp");
+            Object ownedWarp = getOwnedWarp.invoke(teleporter);
+            if (ownedWarp != null && !ownedWarp.toString().isEmpty()) {
+                return ownedWarp.toString();
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    /**
+     * Scan a specific position for protected blocks.
+     */
+    public boolean scanBlocksAtPosition(World world, int x, int y, int z, long currentTick) {
+        if (!ConfigManager.getInstance().isChunkProtectionEnabled()) {
+            return false;
+        }
+
+        try {
+            int blockId = world.getBlock(x, y, z);
+            if (blockId == 0) {
+                return false;
+            }
+
+            BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+            String blockName = blockType != null ? blockType.getId() : "unknown";
+
+            String[] blockKeywords = ConfigManager.getInstance().getProtectedBlockKeywords();
+            if (matchesKeywords(blockName, blockKeywords)) {
+                // Calculate chunk index
+                int chunkX = x >> 4;
+                int chunkZ = z >> 4;
+                long chunkIndex = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+
+                return registry.protectChunk(chunkIndex, "Block: " + blockName, currentTick);
+            }
+        } catch (Exception e) {
+            // Block check failed - ignore
+        }
+
+        return false;
+    }
+
     /**
      * Check if a string matches any of the keywords (case-insensitive).
      */
@@ -297,77 +495,191 @@ public class ChunkProtectionScanner {
         }
         return false;
     }
-    
+
     /**
-     * Scan a specific position for protected blocks.
+     * Initialize reflection handles for TeleporterPlugin.
      */
-    public boolean scanBlocksAtPosition(World world, int x, int y, int z, long currentTick) {
-        if (!ConfigManager.getInstance().isChunkProtectionEnabled()) {
-            return false;
-        }
-        
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void initializeReflection(Store<ChunkStore> store) {
         try {
-            int blockId = world.getBlock(x, y, z);
-            if (blockId == 0) {
-                return false;
-            }
-            
-            BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
-            String blockName = blockType != null ? blockType.getId() : "unknown";
-            
-            String[] blockKeywords = ConfigManager.getInstance().getProtectedBlockKeywords();
-            if (matchesKeywords(blockName, blockKeywords)) {
-                // Calculate chunk index
-                int chunkX = x >> 4;
-                int chunkZ = z >> 4;
-                long chunkIndex = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
-                
-                return registry.protectChunk(chunkIndex, "Block: " + blockName, currentTick);
-            }
-        } catch (Exception e) {
-            // Block check failed - ignore
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Initialize reflection handles.
-     */
-    @SuppressWarnings("unchecked")
-    private void initializeReflection(Store<EntityStore> store) {
-        try {
-            // Find forEachChunk method
-            for (Method m : store.getClass().getMethods()) {
-                if (m.getName().equals("forEachChunk") && m.getParameterCount() == 1) {
-                    forEachChunkMethod = m;
-                    break;
+            // Find TeleporterPlugin class
+            Class<?> teleporterPluginClass = Class.forName(
+                "com.hypixel.hytale.builtin.adventure.teleporter.TeleporterPlugin"
+            );
+
+            // Get the singleton instance via TeleporterPlugin.get()
+            Method getMethod = teleporterPluginClass.getMethod("get");
+            teleporterPlugin = getMethod.invoke(null);
+
+            if (teleporterPlugin != null) {
+                // Get the teleporter component type via getTeleporterComponentType()
+                Method getComponentTypeMethod = teleporterPluginClass.getMethod("getTeleporterComponentType");
+                teleporterComponentType = (ComponentType) getComponentTypeMethod.invoke(teleporterPlugin);
+
+                if (teleporterComponentType != null) {
+                    teleporterPluginAvailable = true;
+
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[ChunkProtectionScanner] TeleporterPlugin found! ComponentType: %s",
+                        teleporterComponentType.getClass().getSimpleName()
+                    );
                 }
             }
-            
-            // Transform component type
-            transformComponentType = TransformComponent.getComponentType();
-            
+
+            // Find ALL forEachChunk methods on Store and log them
+            plugin.getLogger().at(Level.INFO).log("[ChunkProtectionScanner] Looking for forEachChunk methods...");
+            for (Method m : store.getClass().getMethods()) {
+                if (m.getName().equals("forEachChunk")) {
+                    Class<?>[] paramTypes = m.getParameterTypes();
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[ChunkProtectionScanner]   Found: %s (params=%d, first=%s)",
+                        m.toGenericString(), m.getParameterCount(),
+                        paramTypes.length > 0 ? paramTypes[0].getSimpleName() : "none"
+                    );
+
+                    if (m.getParameterCount() == 1) {
+                        // 1-param version - prefer BiPredicate (returns boolean for control)
+                        forEachChunkSimpleMethod = m;
+                    } else if (m.getParameterCount() == 2) {
+                        // Look for forEachChunk(Query, BiConsumer) specifically - void return
+                        String firstParamName = paramTypes[0].getName();
+                        if (firstParamName.contains("Query")) {
+                            // Prefer the void/BiConsumer version over boolean/BiPredicate
+                            if (m.getReturnType() == void.class || forEachChunkFilteredMethod == null) {
+                                forEachChunkFilteredMethod = m;
+                                plugin.getLogger().at(Level.INFO).log(
+                                    "[ChunkProtectionScanner]   -> Using this as filtered method (Query-based, return=%s)",
+                                    m.getReturnType().getSimpleName()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             reflectionInitialized = true;
-            
+
             plugin.getLogger().at(Level.INFO).log(
-                "[ChunkProtectionScanner] Reflection initialized. forEachChunk: %s",
-                forEachChunkMethod != null
+                "[ChunkProtectionScanner] Reflection initialized. TeleporterPlugin: %s, filtered: %s, simple: %s",
+                teleporterPluginAvailable, forEachChunkFilteredMethod != null, forEachChunkSimpleMethod != null
             );
+
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().at(Level.WARNING).log(
+                "[ChunkProtectionScanner] TeleporterPlugin not found - teleporter protection disabled"
+            );
+            reflectionInitialized = true;
+            teleporterPluginAvailable = false;
         } catch (Exception e) {
             plugin.getLogger().at(Level.WARNING).log(
                 "[ChunkProtectionScanner] Reflection init error: %s", e.getMessage()
             );
+            reflectionInitialized = true;
         }
     }
-    
+
     /**
      * Get scan statistics.
      */
     public String getStatus() {
         return String.format(
-            "Total scans: %d, Entities scanned: %d, Protected found: %d, Reflection ready: %s",
-            totalScans, entitiesScanned, protectedFound, reflectionInitialized
+            "Total scans: %d, Teleporters scanned: %d, Protected found: %d, TeleporterPlugin: %s",
+            totalScans, teleportersScanned, protectedFound, teleporterPluginAvailable
         );
+    }
+
+    /**
+     * Check if the teleporter plugin was found and is available.
+     */
+    public boolean isTeleporterPluginAvailable() {
+        return teleporterPluginAvailable;
+    }
+
+    /**
+     * Force re-initialization of reflection handles.
+     */
+    public void resetReflection() {
+        reflectionInitialized = false;
+        teleporterPluginAvailable = false;
+        teleporterPlugin = null;
+        teleporterComponentType = null;
+        forEachChunkSimpleMethod = null;
+        forEachChunkFilteredMethod = null;
+    }
+
+    /**
+     * Log verbose debug info about a teleporter when we can't get its position.
+     */
+    @SuppressWarnings("rawtypes")
+    private void logTeleporterDebugInfo(Object teleporter, ArchetypeChunk chunk, int index) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("[ChunkProtectionScanner] DEBUG - Teleporter info:\n");
+            sb.append("  Class: ").append(teleporter.getClass().getName()).append("\n");
+
+            // List all methods
+            sb.append("  Methods:\n");
+            for (Method m : teleporter.getClass().getMethods()) {
+                if (m.getDeclaringClass() != Object.class && m.getParameterCount() == 0) {
+                    String returnType = m.getReturnType().getSimpleName();
+                    sb.append("    - ").append(m.getName()).append("() -> ").append(returnType);
+                    // Try to invoke and get value
+                    try {
+                        Object value = m.invoke(teleporter);
+                        if (value != null) {
+                            String valStr = value.toString();
+                            if (valStr.length() > 50) valStr = valStr.substring(0, 50) + "...";
+                            sb.append(" = ").append(valStr);
+                        } else {
+                            sb.append(" = null");
+                        }
+                    } catch (Exception e) {
+                        sb.append(" = [error: ").append(e.getClass().getSimpleName()).append("]");
+                    }
+                    sb.append("\n");
+                }
+            }
+
+            // List relevant fields
+            sb.append("  Fields:\n");
+            for (java.lang.reflect.Field f : teleporter.getClass().getDeclaredFields()) {
+                sb.append("    - ").append(f.getName()).append(": ").append(f.getType().getSimpleName());
+                try {
+                    f.setAccessible(true);
+                    Object value = f.get(teleporter);
+                    if (value != null) {
+                        String valStr = value.toString();
+                        if (valStr.length() > 50) valStr = valStr.substring(0, 50) + "...";
+                        sb.append(" = ").append(valStr);
+                    } else {
+                        sb.append(" = null");
+                    }
+                } catch (Exception e) {
+                    sb.append(" = [error]");
+                }
+                sb.append("\n");
+            }
+
+            // Chunk info
+            sb.append("  ArchetypeChunk info:\n");
+            sb.append("    - size: ").append(chunk.size()).append("\n");
+            sb.append("    - index in chunk: ").append(index).append("\n");
+            try {
+                Ref ref = chunk.getReferenceTo(index);
+                if (ref != null) {
+                    sb.append("    - Ref class: ").append(ref.getClass().getName()).append("\n");
+                    sb.append("    - Ref toString: ").append(ref.toString()).append("\n");
+                }
+            } catch (Exception e) {
+                sb.append("    - Ref: [error]\n");
+            }
+
+            plugin.getLogger().at(Level.INFO).log(sb.toString());
+
+        } catch (Exception e) {
+            plugin.getLogger().at(Level.WARNING).log(
+                "[ChunkProtectionScanner] Failed to log debug info: %s", e.getMessage()
+            );
+        }
     }
 }

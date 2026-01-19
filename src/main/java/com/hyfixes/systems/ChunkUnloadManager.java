@@ -580,14 +580,18 @@ public class ChunkUnloadManager {
 
     /**
      * Try to get chunk indexes and release them.
+     * NOTE: Protected chunks are SKIPPED to prevent unloading teleporters/portals.
      */
     private void tryReleaseChunkIndexes() {
         try {
             Object indexes = getChunkIndexesMethod.invoke(chunkStoreInstance);
             if (indexes != null) {
                 int count = getCollectionSize(indexes);
+                int protectedCount = protectionRegistry != null ? protectionRegistry.getProtectedChunkCount() : 0;
+
                 plugin.getLogger().at(Level.INFO).log(
-                    "[ChunkUnloadManager] ChunkStore has " + count + " chunk indexes"
+                    "[ChunkUnloadManager] ChunkStore has %d chunk indexes (%d protected, will be skipped)",
+                    count, protectedCount
                 );
 
                 // Look for a release method that takes chunk index
@@ -598,7 +602,7 @@ public class ChunkUnloadManager {
                         if (params.length == 1 && (params[0] == long.class || params[0] == Long.class)) {
                             releaseRefMethod = m;
                             plugin.getLogger().at(Level.INFO).log(
-                                "[ChunkUnloadManager] Found potential release method: " + m.getName() + "(long)"
+                                "[ChunkUnloadManager] Found potential release method: " + m.getName() + "(long) - protected chunks will be skipped"
                             );
                             break;
                         }
@@ -610,6 +614,16 @@ public class ChunkUnloadManager {
                 "[ChunkUnloadManager] Failed to get chunk indexes: " + e.getMessage()
             );
         }
+    }
+
+    /**
+     * Check if a chunk index is protected and should not be unloaded.
+     *
+     * @param chunkIndex The chunk index to check
+     * @return true if the chunk is protected and should be skipped
+     */
+    public boolean isChunkProtected(long chunkIndex) {
+        return protectionRegistry != null && protectionRegistry.isChunkProtected(chunkIndex);
     }
 
     /**

@@ -21,6 +21,8 @@ import com.hyfixes.listeners.RespawnBlockSanitizer;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
 import com.hyfixes.listeners.ChunkTrackerSanitizer;
 import com.hyfixes.listeners.InstanceTeleportSanitizer;
+import com.hyfixes.listeners.TeleporterProtectionListener;
+import com.hyfixes.listeners.RespawnBlockProtectionListener;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkProtectionRegistry;
 import com.hyfixes.systems.ChunkProtectionScanner;
@@ -73,6 +75,8 @@ public class HyFixes extends JavaPlugin {
     private SpawnBeaconSanitizer spawnBeaconSanitizer;
     private ChunkTrackerSanitizer chunkTrackerSanitizer;
     private InstanceTeleportSanitizer instanceTeleportSanitizer;
+    private TeleporterProtectionListener teleporterProtectionListener;
+    private RespawnBlockProtectionListener respawnBlockProtectionListener;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -187,6 +191,22 @@ public class HyFixes extends JavaPlugin {
                 }
                 
                 getLogger().at(Level.INFO).log("[PROT] ChunkProtectionSystem registered - protects teleporters and portals from cleanup");
+
+                // Register teleporter listener for real-time protection updates
+                teleporterProtectionListener = new TeleporterProtectionListener(this, chunkProtectionRegistry);
+                if (teleporterProtectionListener.isInitialized()) {
+                    getChunkStoreRegistry().registerSystem(teleporterProtectionListener);
+                    chunkCleanupSystem.setTeleporterListener(teleporterProtectionListener);
+                    getLogger().at(Level.INFO).log("[PROT] TeleporterProtectionListener registered - auto-protects new teleporters");
+                } else {
+                    getLogger().at(Level.WARNING).log("[PROT] TeleporterProtectionListener not initialized - teleporter events won't be monitored");
+                }
+
+                // Register bed/respawn block listener for chunk protection
+                respawnBlockProtectionListener = new RespawnBlockProtectionListener(this, chunkProtectionRegistry);
+                getChunkStoreRegistry().registerSystem(respawnBlockProtectionListener);
+                getLogger().at(Level.INFO).log("[PROT] RespawnBlockProtectionListener registered - auto-protects bed/spawn point chunks");
+
             } else {
                 getLogger().at(Level.INFO).log("[DISABLED] ChunkProtectionSystem - disabled via config");
             }

@@ -59,6 +59,9 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     private int protectionVerificationInterval;
     private long lastProtectionScanTick = 0;
 
+    // Teleporter listener for survival tracking
+    private com.hyfixes.listeners.TeleporterProtectionListener teleporterListener = null;
+
     public ChunkCleanupSystem(HyFixes plugin) {
         this.plugin = plugin;
         this.cleanupIntervalTicks = ConfigManager.getInstance().getChunkCleanupIntervalTicks();
@@ -202,6 +205,11 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             );
             hasRunOnce = true;
         }
+
+        // Track cleanup cycle survival for teleporters
+        if (teleporterListener != null) {
+            teleporterListener.onCleanupCycleComplete(currentTick);
+        }
     }
 
     /**
@@ -241,6 +249,19 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             );
         }
     }
+
+    /**
+     * Set the teleporter listener for survival tracking.
+     * Called by HyFixes after listener initialization.
+     */
+    public void setTeleporterListener(com.hyfixes.listeners.TeleporterProtectionListener listener) {
+        this.teleporterListener = listener;
+        if (listener != null) {
+            plugin.getLogger().at(Level.INFO).log(
+                "[ChunkCleanupSystem] Teleporter listener registered for survival tracking"
+            );
+        }
+    }
     
     /**
      * Set the world reference for protection scanning.
@@ -263,6 +284,15 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             protectionStatus = protectionRegistry.getProtectedChunkCount() + " chunks protected";
         }
 
+        String teleporterStatus = "not registered";
+        if (teleporterListener != null) {
+            teleporterStatus = String.format("%d added, %d removed, %d cleanup cycles survived",
+                teleporterListener.getTeleportersAdded(),
+                teleporterListener.getTeleportersRemoved(),
+                teleporterListener.getCleanupCyclesSurvived()
+            );
+        }
+
         return String.format(
             "ChunkCleanupSystem Status (MAIN THREAD):\n" +
             "  ChunkLighting Ready: %s\n" +
@@ -271,14 +301,16 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             "  Instance World Skips: %d\n" +
             "  Last Cleanup: %s\n" +
             "  Interval: %d seconds\n" +
-            "  Chunk Protection: %s",
+            "  Chunk Protection: %s\n" +
+            "  Teleporter Status: %s",
             chunkLightingInstance != null && invalidateLoadedChunksMethod != null,
             cleanupCount.get(),
             successCount.get(),
             threadErrorCount.get(),
             lastRunStr,
             cleanupIntervalTicks / 20,
-            protectionStatus
+            protectionStatus,
+            teleporterStatus
         );
     }
     
