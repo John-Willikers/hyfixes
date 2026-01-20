@@ -1089,3 +1089,49 @@ java.lang.UnsupportedOperationException
 - `ThreadStopMethodVisitor.java` - Try-catch injection
 
 **GitHub Issue:** [#32](https://github.com/John-Willikers/hyfixes/issues/32)
+
+---
+
+## Fix 25: Universe.removePlayer() Memory Leak (v1.9.5)
+
+**Bug:** Server experiences 20GB+ memory leak when players timeout due to incomplete cleanup.
+
+**Error:**
+```
+java.lang.IllegalStateException: Invalid entity reference!
+    at com.hypixel.hytale.component.Ref.validate(Ref.java:59)
+    at com.hypixel.hytale.component.Store.__internal_getComponent(Store.java:1222)
+    at Universe.lambda$removePlayer$0(Universe.java:691)
+```
+
+**Root cause:** Race condition in `Universe.removePlayer()`. When the async cleanup task runs, the entity reference may already be invalidated. The exception prevents `playerComponent.remove()` from executing, leaving ChunkTracker data in memory.
+
+**Memory Leak Mechanism:**
+1. Player times out or disconnects
+2. `Universe.removePlayer()` schedules async cleanup
+3. Async task calls `Store.getComponent(ref, Player.getComponentType())`
+4. Entity ref is already invalidated → throws IllegalStateException
+5. `playerComponent.remove()` never runs
+6. ChunkTracker still holds all loaded chunk references (potentially thousands of HLongSet entries)
+7. 20GB+ memory accumulation over time
+
+**Fix:** ASM bytecode transformer (`UniverseTransformer`) wraps the async lambda with try-catch. On `IllegalStateException`, performs fallback cleanup:
+- Calls `playerRef.getChunkTracker().clear()` to release chunk memory
+- Logs warning for debugging
+- `finalizePlayerRemoval()` still runs via whenComplete handler
+
+**Configuration:**
+```json
+{
+  "transformers": {
+    "universeRemovePlayer": true
+  }
+}
+```
+
+**Files:**
+- `UniverseTransformer.java` - Main transformer
+- `UniverseVisitor.java` - Class visitor for lambda detection
+- `RemovePlayerLambdaVisitor.java` - Try-catch injection with fallback cleanup
+
+**GitHub Issue:** [#34](https://github.com/John-Willikers/hyfixes/issues/34)
