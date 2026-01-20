@@ -12,7 +12,7 @@ import org.objectweb.asm.Opcodes;
 public class UUIDSystemVisitor extends ClassVisitor {
 
     private static final String TARGET_METHOD = "onEntityRemove";
-    private static final String TARGET_DESCRIPTOR = "(I)V"; // Takes entity ID (int), returns void
+    private static final String TARGET_DESCRIPTOR = "(Lcom/hypixel/hytale/component/Ref;Lcom/hypixel/hytale/component/RemoveReason;Lcom/hypixel/hytale/component/Store;Lcom/hypixel/hytale/component/CommandBuffer;)V";
 
     private String className;
     private boolean transformed = false;
