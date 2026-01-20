@@ -52,7 +52,8 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
     @Override
     public void visitLdcInsn(Object value) {
         // Detect the "Duplicate block components" string
-        if (value instanceof String str) {
+        if (value instanceof String) {
+            String str = (String) value;
             if (str.contains("Duplicate block components")) {
                 sawDuplicateBlockComponentsString = true;
                 System.out.println("[HyFixes-Early] Found 'Duplicate block components' exception pattern");
