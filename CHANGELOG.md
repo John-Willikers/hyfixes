@@ -2,6 +2,85 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.9.5] - 2026-01-20
+
+### Added
+
+#### Interaction Timeout Configuration (Early Plugin)
+- **Target:** `PacketHandler.getOperationTimeoutThreshold()`
+- **Bug:** Players get kicked when experiencing network lag during block-breaking or weapon interactions
+- **GitHub Issue:** [#25](https://github.com/John-Willikers/hyfixes/issues/25)
+- **Error:** `RuntimeException: Client took too long to send clientData!`
+- **Root Cause:** Vanilla timeout formula `(ping × 2.0) + 3000ms` is too aggressive for players with unstable connections
+- **Fix:** Bytecode transformation replaces timeout calculation with configurable values:
+  - Default `baseTimeoutMs`: 6000 (was 3000)
+  - Default `pingMultiplier`: 3.0 (was 2.0)
+  - Configurable via `mods/hyfixes/config.json`
+- **Impact:** Players on unstable connections no longer get randomly kicked during interactions
+
+#### UUIDSystem Null Check During Chunk Unload (Early Plugin)
+- **Target:** `EntityStore$UUIDSystem.onEntityRemove()`
+- **Bug:** Server crashes with NPE when removing entities during chunk unload
+- **GitHub Issue:** [#28](https://github.com/John-Willikers/hyfixes/issues/28)
+- **Error:** `NullPointerException: Cannot invoke "UUIDComponent.getUuid()" because "uuidComponent" is null`
+- **Root Cause:** Entities can be removed during chunk unload before their UUIDComponent is initialized
+- **Fix:** Bytecode transformation injects null check before `getUuid()` call:
+  - If null: logs warning, returns early (safe no-op)
+  - If not null: continues normal UUID cleanup
+- **Impact:** Prevents server crashes during chunk unload operations
+
+#### ArchetypeChunk.copySerializableEntity Fix (Early Plugin)
+- **Target:** `ArchetypeChunk.copySerializableEntity()`
+- **Bug:** Server crashes with IndexOutOfBoundsException when serializing entities during chunk saving
+- **GitHub Issue:** [#29](https://github.com/John-Willikers/hyfixes/issues/29)
+- **Error:** `IndexOutOfBoundsException: Index out of range: 11`
+- **Root Cause:** Entity archetype/component data can change while serialization is in progress
+- **Fix:** Extended existing `ArchetypeChunkTransformer` to wrap `copySerializableEntity()` in try-catch:
+  - On exception: logs warning, returns null (skips entity - safe degradation)
+- **Impact:** Prevents server crashes during chunk save operations
+
+#### TickingThread.stop() Java 21+ Compatibility (Early Plugin)
+- **Target:** `TickingThread.stop()`
+- **Bug:** Server crashes when trying to force-stop stuck threads during instance world shutdown
+- **GitHub Issue:** [#32](https://github.com/John-Willikers/hyfixes/issues/32)
+- **Error:** `UnsupportedOperationException` at `Thread.stop()`
+- **Root Cause:** Java 21+ removed `Thread.stop()` - it now throws UnsupportedOperationException
+- **Fix:** Bytecode transformation wraps `Thread.stop()` calls in try-catch:
+  - On exception: falls back to `Thread.interrupt()`, logs warning
+- **Impact:** Instance world shutdown works correctly on Java 21+
+
+#### Universe.removePlayer() Memory Leak Fix (Early Plugin)
+- **Target:** `Universe.removePlayer()` async lambda
+- **Bug:** Server experiences 20GB+ memory leak when players timeout
+- **GitHub Issue:** [#34](https://github.com/John-Willikers/hyfixes/issues/34)
+- **Error:** `IllegalStateException: Invalid entity reference!`
+- **Root Cause:** Race condition - entity ref invalidated before async cleanup runs, preventing `playerComponent.remove()` from executing. ChunkTracker data (thousands of HLongSet entries) never gets released.
+- **Fix:** Bytecode transformation wraps async lambda with try-catch:
+  - On `IllegalStateException`: performs fallback cleanup via `playerRef.getChunkTracker().clear()`
+  - Logs warning for debugging
+  - `finalizePlayerRemoval()` still runs via whenComplete handler
+- **Impact:** Prevents massive memory leaks from player timeouts
+
+### Configuration
+
+New transformer toggles in `mods/hyfixes/config.json`:
+```json
+{
+  "transformers": {
+    "interactionTimeout": true,
+    "uuidSystem": true,
+    "tickingThread": true,
+    "universeRemovePlayer": true
+  },
+  "interactionTimeout": {
+    "baseTimeoutMs": 6000,
+    "pingMultiplier": 3.0
+  }
+}
+```
+
+---
+
 ## [1.6.2] - 2026-01-19
 
 ### Fixed
