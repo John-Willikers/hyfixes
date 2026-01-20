@@ -32,15 +32,18 @@ public class PacketHandlerTransformer implements ClassTransformer {
 
     @Override
     public int priority() {
+        // High priority - we want this transformation to happen early
         return 100;
     }
 
     @Override
     public byte[] transform(String className, String packageName, byte[] classBytes) {
+        // Only transform the PacketHandler class
         if (!className.equals(TARGET_CLASS)) {
             return classBytes;
         }
 
+        // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("interactionTimeout")) {
             System.out.println("[HyFixes-Early] PacketHandlerTransformer DISABLED by config");
             return classBytes;

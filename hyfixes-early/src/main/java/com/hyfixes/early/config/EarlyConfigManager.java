@@ -136,6 +136,7 @@ public class EarlyConfigManager {
             case "commandbuffer" -> t.commandBuffer;
             case "worldmaptracker" -> t.worldMapTracker;
             case "archetypechunk" -> t.archetypeChunk;
+            case "interactiontimeout" -> t.interactionTimeout;
             default -> {
                 System.err.println("[HyFixes-Early-Config] Unknown transformer: " + name);
                 yield true; // Default to enabled for safety
