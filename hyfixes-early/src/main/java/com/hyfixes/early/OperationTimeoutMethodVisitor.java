@@ -17,10 +17,10 @@ public class OperationTimeoutMethodVisitor extends MethodVisitor {
     private final long baseTimeoutMs;
     private final double pingMultiplier;
 
-    // Class/field references from decompiled code
-    private static final String PONG_TYPE = "com/hypixel/hytale/server/core/io/PongType";
-    private static final String PING_INFO = "com/hypixel/hytale/server/core/io/PingInfo";
-    private static final String PING_METRIC_SET = "com/hypixel/hytale/server/core/io/PingMetricSet";
+    // Class/field references - CORRECTED paths from decompiled HytaleServer.jar
+    private static final String PONG_TYPE = "com/hypixel/hytale/protocol/packets/connection/PongType";
+    private static final String PING_INFO = "com/hypixel/hytale/server/core/io/PacketHandler$PingInfo";
+    private static final String HISTORIC_METRIC = "com/hypixel/hytale/metrics/metric/HistoricMetric";
     private static final String TIME_UNIT = "java/util/concurrent/TimeUnit";
 
     public OperationTimeoutMethodVisitor(MethodVisitor methodVisitor, String className,
@@ -58,9 +58,9 @@ public class OperationTimeoutMethodVisitor extends MethodVisitor {
         target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className, "getPingInfo",
                 "(L" + PONG_TYPE + ";)L" + PING_INFO + ";", false);
         target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, PING_INFO, "getPingMetricSet",
-                "()L" + PING_METRIC_SET + ";", false);
+                "()L" + HISTORIC_METRIC + ";", false);
         target.visitInsn(Opcodes.ICONST_0);  // 0 for getAverage parameter
-        target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, PING_METRIC_SET, "getAverage", "(I)D", false);
+        target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, HISTORIC_METRIC, "getAverage", "(I)D", false);
         target.visitVarInsn(Opcodes.DSTORE, 1);  // store average in locals 1-2
 
         // return PingInfo.TIME_UNIT.toMillis(Math.round(average * pingMultiplier)) + baseTimeoutMs;
