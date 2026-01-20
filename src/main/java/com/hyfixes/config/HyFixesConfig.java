@@ -159,6 +159,7 @@ public class HyFixesConfig {
         public boolean archetypeChunk = true;
         public boolean interactionTimeout = true;
         public boolean uuidSystem = true;
+        public boolean tickingThread = true;
     }
 
     /**
