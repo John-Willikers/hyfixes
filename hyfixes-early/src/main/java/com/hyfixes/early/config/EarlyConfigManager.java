@@ -161,4 +161,12 @@ public class EarlyConfigManager {
     public long getWorldRetryDelayMs() {
         return config.world.retryDelayMs;
     }
+
+    // ============================================
+    // InteractionChain transformer settings
+    // ============================================
+
+    public EarlyPluginConfig.InteractionTimeoutConfig getInteractionTimeoutConfig() {
+        return config.interactionTimeout;
+    }
 }
