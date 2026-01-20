@@ -19,6 +19,7 @@ import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
+import com.hyfixes.listeners.DefaultWorldRecoverySanitizer;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
 import com.hyfixes.listeners.ChunkTrackerSanitizer;
 import com.hyfixes.listeners.InstanceTeleportSanitizer;
@@ -76,6 +77,7 @@ public class HyFixes extends JavaPlugin {
     private SpawnBeaconSanitizer spawnBeaconSanitizer;
     private ChunkTrackerSanitizer chunkTrackerSanitizer;
     private InstanceTeleportSanitizer instanceTeleportSanitizer;
+    private DefaultWorldRecoverySanitizer defaultWorldRecoverySanitizer;
     private TeleporterProtectionListener teleporterProtectionListener;
     private RespawnBlockProtectionListener respawnBlockProtectionListener;
 
@@ -303,6 +305,17 @@ public class HyFixes extends JavaPlugin {
         // The early plugin transforms SpawnMarkerEntity constructor to initialize npcReferences
         getLogger().at(Level.INFO).log("[MOVED] SpawnMarkerReferenceSanitizer - now fixed via early plugin bytecode transformation");
 
+        // Fix 16: Default World Recovery (v1.4.3)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/23
+        // Automatically reloads the default world when it crashes exceptionally
+        if (config.isSanitizerEnabled("defaultWorldRecovery")) {
+            defaultWorldRecoverySanitizer = new DefaultWorldRecoverySanitizer(this);
+            defaultWorldRecoverySanitizer.register();
+            getLogger().at(Level.INFO).log("[FIX] DefaultWorldRecoverySanitizer registered - auto-recovers default world after crash");
+        } else {
+            getLogger().at(Level.INFO).log("[DISABLED] DefaultWorldRecoverySanitizer - disabled via config");
+        }
+
         // Fix 14: ChunkTracker null PlayerRef crash (v1.3.9)
         // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/6
         // Prevents world crash when ChunkTracker has invalid PlayerRefs after player disconnect
@@ -454,5 +467,12 @@ public class HyFixes extends JavaPlugin {
      */
     public ChunkProtectionScanner getChunkProtectionScanner() {
         return chunkProtectionScanner;
+    }
+
+    /**
+     * Get the DefaultWorldRecoverySanitizer for commands and status.
+     */
+    public DefaultWorldRecoverySanitizer getDefaultWorldRecoverySanitizer() {
+        return defaultWorldRecoverySanitizer;
     }
 }
