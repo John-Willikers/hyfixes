@@ -225,6 +225,7 @@ public class ConfigManager {
             case "emptyarchetype" -> s.emptyArchetype;
             case "instancepositiontracker" -> s.instancePositionTracker;
             case "pickupitemchunkhandler" -> s.pickupItemChunkHandler;
+            case "defaultworldrecovery" -> s.defaultWorldRecovery;
             default -> {
                 System.err.println("[HyFixes-Config] Unknown sanitizer: " + name);
                 yield true; // Default to enabled for safety
