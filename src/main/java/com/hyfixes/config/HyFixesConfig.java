@@ -158,6 +158,7 @@ public class HyFixesConfig {
         public boolean worldMapTracker = true;
         public boolean archetypeChunk = true;
         public boolean interactionTimeout = true;
+        public boolean uuidSystem = true;
     }
 
     /**
