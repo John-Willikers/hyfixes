@@ -99,6 +99,7 @@ public class HyFixesConfig {
         public boolean emptyArchetype = true;
         public boolean instancePositionTracker = true;
         public boolean pickupItemChunkHandler = true;
+        public boolean defaultWorldRecovery = true;  // Auto-reload default world after crash
     }
 
     /**
