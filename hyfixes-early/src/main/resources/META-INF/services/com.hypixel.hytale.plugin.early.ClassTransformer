@@ -11,3 +11,4 @@ com.hyfixes.early.WorldMapTrackerTransformer
 com.hyfixes.early.ArchetypeChunkTransformer
 com.hyfixes.early.PacketHandlerTransformer
 com.hyfixes.early.UUIDSystemTransformer
+com.hyfixes.early.TickingThreadTransformer

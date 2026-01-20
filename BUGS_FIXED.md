@@ -1056,3 +1056,36 @@ java.lang.IndexOutOfBoundsException: Index out of range: 11
 - `ArchetypeChunkVisitor.java` - Added CopySerializableEntityMethodVisitor
 
 **GitHub Issue:** [#29](https://github.com/John-Willikers/hyfixes/issues/29)
+
+---
+
+## Fix 24: TickingThread.stop() UnsupportedOperationException (v1.9.5)
+
+**Bug:** Server crashes with UnsupportedOperationException when trying to force-stop stuck threads during instance world shutdown.
+
+**Stack trace:**
+```
+java.lang.UnsupportedOperationException
+    at java.base/java.lang.Thread.stop(Thread.java:1557)
+    at com.hypixel.hytale.server.core.util.thread.TickingThread.stop(TickingThread.java:164)
+```
+
+**Root cause:** Java 21+ removed `Thread.stop()` - it now throws UnsupportedOperationException. Hytale's `TickingThread.stop()` method calls `Thread.stop()` to force-kill stuck threads.
+
+**Fix:** ASM bytecode transformer (`TickingThreadTransformer`) wraps `Thread.stop()` calls in try-catch. On UnsupportedOperationException, falls back to `Thread.interrupt()` and logs a warning.
+
+**Configuration:**
+```json
+{
+  "transformers": {
+    "tickingThread": true
+  }
+}
+```
+
+**Files:**
+- `TickingThreadTransformer.java` - Main transformer
+- `TickingThreadVisitor.java` - Class visitor for stop() method
+- `ThreadStopMethodVisitor.java` - Try-catch injection
+
+**GitHub Issue:** [#32](https://github.com/John-Willikers/hyfixes/issues/32)
