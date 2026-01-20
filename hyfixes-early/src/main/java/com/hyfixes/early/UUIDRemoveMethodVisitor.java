@@ -26,7 +26,7 @@ public class UUIDRemoveMethodVisitor extends MethodVisitor {
     private boolean injectedNullCheck = false;
 
     // UUIDComponent class internal name
-    private static final String UUID_COMPONENT_TYPE = "com/hypixel/hytale/server/entity/components/UUIDComponent";
+    private static final String UUID_COMPONENT_TYPE = "com/hypixel/hytale/server/core/entity/UUIDComponent";
     private static final String GET_UUID_METHOD = "getUuid";
 
     public UUIDRemoveMethodVisitor(MethodVisitor methodVisitor, String className) {
