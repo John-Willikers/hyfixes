@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - InteractionChain Bytecode Transformer
  *
@@ -45,15 +47,15 @@ public class InteractionChainTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("interactionChain")) {
-            System.out.println("[HyFixes-Early] InteractionChainTransformer DISABLED by config");
+            info("InteractionChainTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming InteractionChain class...");
-        System.out.println("[HyFixes-Early] Fixing putInteractionSyncData() buffer overflow bug");
-        System.out.println("[HyFixes-Early] Fixing removeInteractionEntry() out-of-order bug (Issue #40)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming InteractionChain class...");
+        verbose("Fixing putInteractionSyncData() buffer overflow bug");
+        verbose("Fixing removeInteractionEntry() out-of-order bug (Issue #40)");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -63,16 +65,15 @@ public class InteractionChainTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] InteractionChain transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("InteractionChain transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform InteractionChain!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform InteractionChain!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

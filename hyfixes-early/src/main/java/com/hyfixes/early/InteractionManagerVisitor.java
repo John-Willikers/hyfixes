@@ -4,11 +4,14 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for InteractionManager.
  *
- * This visitor intercepts the serverTick method and applies the timeout fix:
+ * This visitor intercepts methods and applies fixes:
  * - serverTick - throws RuntimeException when client is too slow (Issue #40)
+ * - All methods - downgrades "Client finished chain" log spam from SEVERE to FINE
  */
 public class InteractionManagerVisitor extends ClassVisitor {
 
@@ -30,9 +33,12 @@ public class InteractionManagerVisitor extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
+        // Apply log suppression to all methods (downgrades "Client finished chain" spam)
+        mv = new LogSuppressorMethodVisitor(mv);
+
         if (name.equals(SERVER_TICK_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying client timeout fix (Issue #40)...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying client timeout fix (Issue #40)...");
             return new ServerTickMethodVisitor(mv, className);
         }
 

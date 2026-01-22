@@ -5,6 +5,8 @@ import com.hypixel.hytale.plugin.early.ClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassTransformer that fixes the root cause of null npcReferences in SpawnMarkerEntity.
  *
@@ -50,14 +52,14 @@ public class SpawnMarkerEntityTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("spawnMarkerEntity")) {
-            System.out.println("[HyFixes-Early] SpawnMarkerEntityTransformer DISABLED by config");
+            info("SpawnMarkerEntityTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] Transforming SpawnMarkerEntity class...");
-        System.out.println("[HyFixes-Early] Fix 1: Constructor - initialize npcReferences to empty array");
-        System.out.println("[HyFixes-Early] Fix 2: setNpcReferences() - convert null to empty array");
-        System.out.println("[HyFixes-Early] Fix 3: spawnNPC() - create array when storedFlock is null");
+        info("Transforming SpawnMarkerEntity class...");
+        verbose("Fix 1: Constructor - initialize npcReferences to empty array");
+        verbose("Fix 2: setNpcReferences() - convert null to empty array");
+        verbose("Fix 3: spawnNPC() - create array when storedFlock is null");
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -66,18 +68,17 @@ public class SpawnMarkerEntityTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             if (visitor.isFullyTransformed()) {
-                System.out.println("[HyFixes-Early] SpawnMarkerEntity transformation COMPLETE! (both fixes applied)");
+                info("SpawnMarkerEntity transformation COMPLETE! (both fixes applied)");
                 return writer.toByteArray();
             } else if (visitor.isTransformed()) {
-                System.out.println("[HyFixes-Early] SpawnMarkerEntity transformation PARTIAL - some fixes applied");
+                info("SpawnMarkerEntity transformation PARTIAL - some fixes applied");
                 return writer.toByteArray();
             } else {
-                System.out.println("[HyFixes-Early] WARNING: SpawnMarkerEntity transformation may not have applied!");
+                info("WARNING: SpawnMarkerEntity transformation may not have applied!");
                 return writer.toByteArray();
             }
         } catch (Exception e) {
-            System.out.println("[HyFixes-Early] ERROR transforming SpawnMarkerEntity: " + e.getMessage());
-            e.printStackTrace();
+            error("ERROR transforming SpawnMarkerEntity: " + e.getMessage(), e);
             return classBytes;
         }
     }

@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - PacketHandler Bytecode Transformer
  *
@@ -45,17 +47,17 @@ public class PacketHandlerTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("interactionTimeout")) {
-            System.out.println("[HyFixes-Early] PacketHandlerTransformer DISABLED by config");
+            info("PacketHandlerTransformer DISABLED by config");
             return classBytes;
         }
 
         var config = EarlyConfigManager.getInstance().getInteractionTimeoutConfig();
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming PacketHandler class...");
-        System.out.println("[HyFixes-Early] Fixing interaction timeout (hatchet/tree bug)");
-        System.out.println("[HyFixes-Early] Config: baseTimeoutMs=" + config.baseTimeoutMs +
+        separator();
+        info("Transforming PacketHandler class...");
+        verbose("Fixing interaction timeout (hatchet/tree bug)");
+        verbose("Config: baseTimeoutMs=" + config.baseTimeoutMs +
                            ", pingMultiplier=" + config.pingMultiplier);
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -65,16 +67,15 @@ public class PacketHandlerTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] PacketHandler transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("PacketHandler transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform PacketHandler!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform PacketHandler!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

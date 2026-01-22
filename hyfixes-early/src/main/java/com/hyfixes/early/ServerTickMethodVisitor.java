@@ -12,13 +12,18 @@ import org.objectweb.asm.Opcodes;
  * to send clientData" when the timeout is exceeded. This kicks the player.
  *
  * Fix: Wrap the ENTIRE method body in try-catch. Catch RuntimeException, check
- * if it's the timeout message, log warning and return null instead of kicking.
+ * if it's the timeout message, properly cancel the chain and return null.
  * Re-throw if it's a different exception.
+ *
+ * IMPORTANT: We use cancelChains(chain) instead of just removing from the map.
+ * This properly notifies the client that the chain was cancelled, preventing
+ * "Client finished chain earlier than server" desync errors.
  *
  * Method signature: private InteractionSyncData serverTick(Ref, InteractionChain, long)
  *
  * @see <a href="https://github.com/John-Willikers/hyfixes/issues/40">Issue #40</a>
  * @see <a href="https://github.com/John-Willikers/hyfixes/issues/46">Issue #46</a>
+ * @see <a href="https://github.com/John-Willikers/hyfixes/issues/51">Issue #51</a>
  */
 public class ServerTickMethodVisitor extends MethodVisitor {
 
@@ -103,11 +108,43 @@ public class ServerTickMethodVisitor extends MethodVisitor {
         mv.visitVarInsn(Opcodes.ALOAD, EXCEPTION_LOCAL);
         mv.visitInsn(Opcodes.ATHROW);
 
-        // It's the timeout exception - log and return null instead of kicking player
+        // It's the timeout exception - properly cancel the chain instead of kicking player
+        // Issue #51: Must use cancelChains() to properly notify client, not just remove from map!
         mv.visitLabel(isTimeoutException);
-        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-        mv.visitLdcInsn("[HyFixes] Suppressed client timeout in serverTick() - player NOT kicked (Issue #46)");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+
+        // === PROPERLY CANCEL THE CHAIN ===
+        // Method params: this=0 (InteractionManager), entityRef=1, chain=2, currentTick=3-4
+        // Call: this.cancelChains(chain) - this notifies the client and cleans up properly
+
+        Label cancelTryStart = new Label();
+        Label cancelTryEnd = new Label();
+        Label cancelCatch = new Label();
+        Label afterCancel = new Label();
+
+        // Register try-catch for cancellation (in case something fails)
+        mv.visitTryCatchBlock(cancelTryStart, cancelTryEnd, cancelCatch, "java/lang/Throwable");
+
+        mv.visitLabel(cancelTryStart);
+
+        // this.cancelChains(chain) - properly cancels and notifies client
+        mv.visitVarInsn(Opcodes.ALOAD, 0);  // this (InteractionManager)
+        mv.visitVarInsn(Opcodes.ALOAD, 2);  // chain (InteractionChain)
+        mv.visitMethodInsn(
+            Opcodes.INVOKEVIRTUAL,
+            "com/hypixel/hytale/server/core/entity/InteractionManager",
+            "cancelChains",
+            "(Lcom/hypixel/hytale/server/core/entity/InteractionChain;)V",
+            false
+        );
+
+        mv.visitLabel(cancelTryEnd);
+        mv.visitJumpInsn(Opcodes.GOTO, afterCancel);
+
+        // Catch block - swallow error if cancellation fails
+        mv.visitLabel(cancelCatch);
+        mv.visitInsn(Opcodes.POP); // pop the exception
+
+        mv.visitLabel(afterCancel);
 
         // Return null (graceful failure instead of kick)
         mv.visitInsn(Opcodes.ACONST_NULL);

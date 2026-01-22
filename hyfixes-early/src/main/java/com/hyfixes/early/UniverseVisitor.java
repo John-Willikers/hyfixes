@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for Universe class.
  * Intercepts the lambda method used in removePlayer() async block.
@@ -31,15 +33,15 @@ public class UniverseVisitor extends ClassVisitor {
         // We ONLY want the lambda that has PlayerRef as a parameter - that's the whenComplete
         // handler that can perform fallback cleanup. Other lambdas don't have access to PlayerRef.
         if (name.startsWith("lambda$removePlayer$")) {
-            System.out.println("[HyFixes-Early] Found lambda method: " + className + "." + name + descriptor);
+            verbose("Found lambda method: " + className + "." + name + descriptor);
 
             // Only transform if descriptor contains PlayerRef - that's the lambda we can clean up with
             if (descriptor.contains("PlayerRef")) {
-                System.out.println("[HyFixes-Early] Lambda has PlayerRef parameter - applying fallback cleanup transform");
+                verbose("Lambda has PlayerRef parameter - applying fallback cleanup transform");
                 transformed = true;
                 return new RemovePlayerLambdaVisitor(mv, className, name, descriptor, access);
             } else {
-                System.out.println("[HyFixes-Early] Lambda doesn't have PlayerRef - skipping");
+                verbose("Lambda doesn't have PlayerRef - skipping");
             }
         }
 

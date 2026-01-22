@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for InteractionChain.
  *
@@ -35,20 +37,20 @@ public class InteractionChainVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(PUT_SYNC_DATA_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying buffer overflow fix...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying buffer overflow fix...");
             return new PutSyncDataMethodVisitor(mv, className);
         }
 
         if (name.equals(UPDATE_SYNC_POSITION_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying sync position fix...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying sync position fix...");
             return new UpdateSyncPositionMethodVisitor(mv, className);
         }
 
         if (name.equals(REMOVE_INTERACTION_ENTRY_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying remove out-of-order fix (Issue #40)...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying remove out-of-order fix (Issue #40)...");
             return new RemoveInteractionEntryMethodVisitor(mv, className);
         }
 

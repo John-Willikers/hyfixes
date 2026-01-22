@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - BeaconSpawnController Bytecode Transformer
  *
@@ -42,14 +44,14 @@ public class BeaconSpawnControllerTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("beaconSpawnController")) {
-            System.out.println("[HyFixes-Early] BeaconSpawnControllerTransformer DISABLED by config");
+            info("BeaconSpawnControllerTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming BeaconSpawnController...");
-        System.out.println("[HyFixes-Early] Fixing null spawn crash in createRandomSpawnJob()");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming BeaconSpawnController...");
+        verbose("Fixing null spawn crash in createRandomSpawnJob()");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -59,16 +61,15 @@ public class BeaconSpawnControllerTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] BeaconSpawnController transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("BeaconSpawnController transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform BeaconSpawnController!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform BeaconSpawnController!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

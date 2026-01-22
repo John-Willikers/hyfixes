@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -70,7 +71,7 @@ public class BeaconAddRemoveMethodVisitor extends MethodVisitor {
             owner.equals(GET_SPAWN_CONTROLLER_OWNER) &&
             name.equals(GET_SPAWN_CONTROLLER_NAME)) {
             sawGetSpawnController = true;
-            System.out.println("[HyFixes-Early] Detected getSpawnController() call");
+            verbose("Detected getSpawnController() call");
         }
     }
 
@@ -83,7 +84,7 @@ public class BeaconAddRemoveMethodVisitor extends MethodVisitor {
             sawGetSpawnController = false;
             spawnControllerLocalVar = var;
 
-            System.out.println("[HyFixes-Early] Injecting null check for spawnController (local var " + var + ")");
+            verbose("Injecting null check for spawnController (local var " + var + ")");
 
             // Generate null check:
             // if (spawnController == null) {

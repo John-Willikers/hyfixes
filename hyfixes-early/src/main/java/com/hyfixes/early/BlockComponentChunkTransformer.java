@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - BlockComponentChunk Bytecode Transformer
  *
@@ -45,14 +47,14 @@ public class BlockComponentChunkTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("blockComponentChunk")) {
-            System.out.println("[HyFixes-Early] BlockComponentChunkTransformer DISABLED by config");
+            info("BlockComponentChunkTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming BlockComponentChunk...");
-        System.out.println("[HyFixes-Early] Fixing duplicate block component crash (Issue #8)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming BlockComponentChunk...");
+        verbose("Fixing duplicate block component crash (Issue #8)");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -62,16 +64,15 @@ public class BlockComponentChunkTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] BlockComponentChunk transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("BlockComponentChunk transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform BlockComponentChunk!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform BlockComponentChunk!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

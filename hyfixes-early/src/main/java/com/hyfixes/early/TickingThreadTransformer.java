@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * Transformer for TickingThread to fix Thread.stop() UnsupportedOperationException on Java 21+.
  *
@@ -31,13 +33,13 @@ public class TickingThreadTransformer implements ClassTransformer {
         }
 
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("tickingThread")) {
-            System.out.println("[HyFixes-Early] TickingThreadTransformer is disabled, skipping");
+            info("TickingThreadTransformer DISABLED by config");
             return classBytes;
         }
 
         try {
-            System.out.println("[HyFixes-Early] Transforming: " + TARGET_CLASS);
-            System.out.println("[HyFixes-Early] Fixing Thread.stop() UnsupportedOperationException (Issue #32)");
+            info("Transforming: " + TARGET_CLASS);
+            verbose("Fixing Thread.stop() UnsupportedOperationException (Issue #32)");
 
             ClassReader reader = new ClassReader(classBytes);
             ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -46,15 +48,14 @@ public class TickingThreadTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             if (visitor.isTransformed()) {
-                System.out.println("[HyFixes-Early] Successfully transformed TickingThread.stop()");
+                info("TickingThread transformation COMPLETE!");
                 return writer.toByteArray();
             } else {
-                System.err.println("[HyFixes-Early] WARNING: TickingThread transformation did not apply!");
+                error("WARNING: TickingThread transformation did not apply!");
                 return classBytes;
             }
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] Error transforming TickingThread: " + e.getMessage());
-            e.printStackTrace();
+            error("Error transforming TickingThread: " + e.getMessage(), e);
             return classBytes;
         }
     }

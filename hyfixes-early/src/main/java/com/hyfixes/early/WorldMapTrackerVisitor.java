@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for WorldMapTracker transformation.
  * Intercepts the unloadImages method to add NPE protection for iterator corruption.
@@ -30,8 +32,8 @@ public class WorldMapTrackerVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(UNLOAD_IMAGES_METHOD) && descriptor.equals(UNLOAD_IMAGES_DESCRIPTOR)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying iterator NPE protection...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying iterator NPE protection...");
             return new UnloadImagesMethodVisitor(mv, className);
         }
 

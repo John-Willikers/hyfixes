@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for EntityStore$UUIDSystem.
  *
@@ -32,8 +34,8 @@ public class UUIDSystemVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(TARGET_METHOD) && descriptor.equals(TARGET_DESCRIPTOR)) {
-            System.out.println("[HyFixes-Early] Found method: " + className + "." + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying uuidComponent null check...");
+            verbose("Found method: " + className + "." + name + descriptor);
+            verbose("Applying uuidComponent null check...");
             transformed = true;
             return new UUIDRemoveMethodVisitor(mv, className);
         }

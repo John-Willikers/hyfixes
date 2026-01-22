@@ -5,6 +5,8 @@ import com.hypixel.hytale.plugin.early.ClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * Transformer for EntityStore$UUIDSystem to fix NPE during chunk unload.
  *
@@ -32,12 +34,12 @@ public class UUIDSystemTransformer implements ClassTransformer {
 
         // Check if transformer is enabled
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("uuidSystem")) {
-            System.out.println("[HyFixes-Early] UUIDSystemTransformer is disabled, skipping");
+            info("UUIDSystemTransformer DISABLED by config");
             return classBytes;
         }
 
         try {
-            System.out.println("[HyFixes-Early] Transforming: " + TARGET_CLASS);
+            info("Transforming: " + TARGET_CLASS);
 
             ClassReader reader = new ClassReader(classBytes);
             ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -46,15 +48,14 @@ public class UUIDSystemTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             if (visitor.isTransformed()) {
-                System.out.println("[HyFixes-Early] Successfully transformed UUIDSystem.onEntityRemove()");
+                info("UUIDSystem transformation COMPLETE!");
                 return writer.toByteArray();
             } else {
-                System.err.println("[HyFixes-Early] WARNING: UUIDSystem transformation did not apply!");
+                error("WARNING: UUIDSystem transformation did not apply!");
                 return classBytes;
             }
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] Error transforming UUIDSystem: " + e.getMessage());
-            e.printStackTrace();
+            error("Error transforming UUIDSystem: " + e.getMessage(), e);
             return classBytes;
         }
     }

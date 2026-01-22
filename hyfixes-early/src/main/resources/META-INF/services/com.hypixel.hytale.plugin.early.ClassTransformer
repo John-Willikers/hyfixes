@@ -15,3 +15,4 @@ com.hyfixes.early.UUIDSystemTransformer
 com.hyfixes.early.TickingThreadTransformer
 com.hyfixes.early.UniverseTransformer
 com.hyfixes.early.LivingEntityTransformer
+com.hyfixes.early.SetMemoriesCapacityTransformer

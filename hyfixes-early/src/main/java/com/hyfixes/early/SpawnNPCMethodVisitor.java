@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -78,7 +79,7 @@ public class SpawnNPCMethodVisitor extends MethodVisitor {
         // Track GETFIELD storedFlock after ALOAD 0
         if (sawAload0 && opcode == Opcodes.GETFIELD && name.equals("storedFlock")) {
             sawStoredFlockGetfield = true;
-            System.out.println("[HyFixes-Early] Found storedFlock field access in spawnNPC");
+            verbose("Found storedFlock field access in spawnNPC");
         } else {
             sawAload0 = false;
             sawStoredFlockGetfield = false;
@@ -92,7 +93,7 @@ public class SpawnNPCMethodVisitor extends MethodVisitor {
         // Track IFNULL after GETFIELD storedFlock - confirms this method has the bug pattern
         if (sawStoredFlockGetfield && opcode == Opcodes.IFNULL) {
             sawStoredFlockNullCheck = true;
-            System.out.println("[HyFixes-Early] Found storedFlock null check pattern - will inject fix before return");
+            verbose("Found storedFlock null check pattern - will inject fix before return");
         }
 
         sawAload0 = false;
@@ -109,7 +110,7 @@ public class SpawnNPCMethodVisitor extends MethodVisitor {
         // Inject our fix right before ICONST_1 that follows refreshTimeout() call
         // This is the successful return path at the end of the method
         if (opcode == Opcodes.ICONST_1 && sawStoredFlockNullCheck && sawRefreshTimeoutCall && !injectedFix) {
-            System.out.println("[HyFixes-Early] Injecting npcReferences null fix before success return");
+            verbose("Injecting npcReferences null fix before success return");
 
             // Inject: if (this.npcReferences == null && npcRef != null) { create array }
             injectNpcReferencesNullFix();
@@ -220,7 +221,7 @@ public class SpawnNPCMethodVisitor extends MethodVisitor {
         // Track call to refreshTimeout() - the success return follows this
         if (name.equals("refreshTimeout") && owner.contains("SpawnMarkerEntity")) {
             sawRefreshTimeoutCall = true;
-            System.out.println("[HyFixes-Early] Detected refreshTimeout() call in spawnNPC");
+            verbose("Detected refreshTimeout() call in spawnNPC");
         }
     }
 
@@ -287,11 +288,11 @@ public class SpawnNPCMethodVisitor extends MethodVisitor {
     public void visitEnd() {
         if (!injectedFix) {
             if (sawStoredFlockNullCheck) {
-                System.out.println("[HyFixes-Early] WARNING: Found storedFlock null check but couldn't inject fix!");
+                verbose("WARNING: Found storedFlock null check but couldn't inject fix!");
             } else {
-                System.out.println("[HyFixes-Early] WARNING: Could not find storedFlock null check pattern!");
+                verbose("WARNING: Could not find storedFlock null check pattern!");
             }
-            System.out.println("[HyFixes-Early] The method structure may have changed - fix may not be applied.");
+            verbose("The method structure may have changed - fix may not be applied.");
         }
         target.visitEnd();
     }

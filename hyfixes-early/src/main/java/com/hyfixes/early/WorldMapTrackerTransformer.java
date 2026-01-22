@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - WorldMapTracker Bytecode Transformer
  *
@@ -46,14 +48,14 @@ public class WorldMapTrackerTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("worldMapTracker")) {
-            System.out.println("[HyFixes-Early] WorldMapTrackerTransformer DISABLED by config");
+            info("WorldMapTrackerTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming WorldMapTracker...");
-        System.out.println("[HyFixes-Early] Fixing iterator corruption crash in unloadImages()");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming WorldMapTracker...");
+        verbose("Fixing iterator corruption crash in unloadImages()");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -63,16 +65,15 @@ public class WorldMapTrackerTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] WorldMapTracker transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("WorldMapTracker transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform WorldMapTracker!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform WorldMapTracker!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

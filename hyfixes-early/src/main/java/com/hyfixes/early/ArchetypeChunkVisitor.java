@@ -5,6 +5,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Label;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor that transforms ArchetypeChunk.getComponent()
  * to handle IndexOutOfBoundsException gracefully.
@@ -32,15 +34,15 @@ public class ArchetypeChunkVisitor extends ClassVisitor {
 
         // Target: getComponent methods that return Component
         if (name.equals("getComponent") && descriptor.contains("Lcom/hypixel/hytale/component/Component;")) {
-            System.out.println("[HyFixes-Early] Found getComponent method: " + descriptor);
-            System.out.println("[HyFixes-Early] Wrapping with IndexOutOfBoundsException handler");
+            verbose("Found getComponent method: " + descriptor);
+            verbose("Wrapping with IndexOutOfBoundsException handler");
             return new GetComponentMethodVisitor(mv, access, descriptor);
         }
 
         // Also target: copySerializableEntity method
         if (name.equals("copySerializableEntity")) {
-            System.out.println("[HyFixes-Early] Found copySerializableEntity method: " + descriptor);
-            System.out.println("[HyFixes-Early] Wrapping with IndexOutOfBoundsException handler");
+            verbose("Found copySerializableEntity method: " + descriptor);
+            verbose("Wrapping with IndexOutOfBoundsException handler");
             return new CopySerializableEntityMethodVisitor(mv, access, descriptor);
         }
 

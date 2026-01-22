@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - LivingEntity Bytecode Transformer
  *
@@ -39,14 +41,14 @@ public class LivingEntityTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("livingEntity")) {
-            System.out.println("[HyFixes-Early] LivingEntityTransformer DISABLED by config");
+            info("LivingEntityTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming LivingEntity class...");
-        System.out.println("[HyFixes-Early] Fixing inventory sharing bug (Issue #45)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming LivingEntity class...");
+        verbose("Fixing inventory sharing bug (Issue #45)");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -56,16 +58,15 @@ public class LivingEntityTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] LivingEntity transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("LivingEntity transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform LivingEntity!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform LivingEntity!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

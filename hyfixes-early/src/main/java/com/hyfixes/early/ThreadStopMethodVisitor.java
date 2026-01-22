@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -44,7 +45,7 @@ public class ThreadStopMethodVisitor extends MethodVisitor {
             name.equals("stop") &&
             descriptor.equals("()V")) {
 
-            System.out.println("[HyFixes-Early] Injecting try-catch around Thread.stop()");
+            verbose("Injecting try-catch around Thread.stop()");
 
             // At this point, the Thread object is on the stack
             // Store it in a local variable so we can access it in the catch block

@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for TickingThread.
  * Intercepts the stop() method to wrap Thread.stop() calls.
@@ -30,8 +32,8 @@ public class TickingThreadVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(TARGET_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + className + "." + name + descriptor);
-            System.out.println("[HyFixes-Early] Wrapping Thread.stop() with fallback to interrupt()...");
+            verbose("Found method: " + className + "." + name + descriptor);
+            verbose("Wrapping Thread.stop() with fallback to interrupt()...");
             transformed = true;
             return new ThreadStopMethodVisitor(mv, className);
         }

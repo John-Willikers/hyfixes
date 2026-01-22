@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ClassVisitor that intercepts methods in SpawnMarkerEntity to fix null npcReferences:
  *
@@ -40,23 +42,23 @@ public class SpawnMarkerEntityVisitor extends ClassVisitor {
 
         // Transform constructor - initialize npcReferences to empty array
         if (name.equals(CONSTRUCTOR) && descriptor.equals(CONSTRUCTOR_DESC)) {
-            System.out.println("[HyFixes-Early] Found constructor: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Transforming constructor to initialize npcReferences");
+            verbose("Found constructor: " + name + descriptor);
+            verbose("Transforming constructor to initialize npcReferences");
             constructorTransformed = true;
             return new SpawnMarkerEntityConstructorVisitor(mv);
         }
 
         // Transform spawnNPC() - fix for new spawns where storedFlock is null
         if (name.equals(SPAWN_NPC_METHOD) && descriptor.contains(SPAWN_NPC_DESC_CONTAINS)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
+            verbose("Found method: " + name + descriptor);
             spawnNpcTransformed = true;
             return new SpawnNPCMethodVisitor(mv, className);
         }
 
         // Transform setNpcReferences() - fix for CODEC deserialization
         if (name.equals(SET_NPC_REFS_METHOD) && descriptor.equals(SET_NPC_REFS_DESC)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Transforming setNpcReferences() to reject null");
+            verbose("Found method: " + name + descriptor);
+            verbose("Transforming setNpcReferences() to reject null");
             setNpcRefsTransformed = true;
             return new SetNpcReferencesMethodVisitor(mv);
         }

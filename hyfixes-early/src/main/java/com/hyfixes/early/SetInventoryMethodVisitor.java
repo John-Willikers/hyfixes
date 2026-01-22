@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -92,6 +93,6 @@ public class SetInventoryMethodVisitor extends MethodVisitor {
 
         mv.visitLabel(afterCatch);
 
-        System.out.println("[HyFixes-Early] Injected inventory ownership validation into " + methodName);
+        verbose("Injected inventory ownership validation into " + methodName);
     }
 }

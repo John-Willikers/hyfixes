@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - TrackedPlacement Bytecode Transformer
  *
@@ -47,15 +49,15 @@ public class TrackedPlacementTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("trackedPlacement")) {
-            System.out.println("[HyFixes-Early] TrackedPlacementTransformer DISABLED by config");
+            info("TrackedPlacementTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming TrackedPlacement$OnAddRemove class...");
-        System.out.println("[HyFixes-Early] Fixing BlockCounter decrement null check bug");
-        System.out.println("[HyFixes-Early] Issue: https://github.com/John-Willikers/hyfixes/issues/11");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming TrackedPlacement$OnAddRemove class...");
+        verbose("Fixing BlockCounter decrement null check bug");
+        verbose("Issue: https://github.com/John-Willikers/hyfixes/issues/11");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -65,16 +67,15 @@ public class TrackedPlacementTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] TrackedPlacement$OnAddRemove transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("TrackedPlacement$OnAddRemove transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform TrackedPlacement$OnAddRemove!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform TrackedPlacement$OnAddRemove!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for World class transformation.
  * Intercepts the addPlayer method to apply the race condition fix.
@@ -32,8 +34,8 @@ public class WorldVisitor extends ClassVisitor {
 
         // Only transform the 4-parameter addPlayer method
         if (name.equals(ADD_PLAYER_METHOD) && descriptor.equals(ADD_PLAYER_DESC)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying instance teleport race condition fix...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying instance teleport race condition fix...");
             return new WorldAddPlayerMethodVisitor(mv, className);
         }
 

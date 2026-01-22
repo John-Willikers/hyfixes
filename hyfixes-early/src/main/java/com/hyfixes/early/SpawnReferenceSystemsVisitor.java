@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for SpawnReferenceSystems$BeaconAddRemoveSystem transformation.
  * Intercepts the onEntityAdded method to add null check for spawnController.
@@ -29,8 +31,8 @@ public class SpawnReferenceSystemsVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(ON_ENTITY_ADDED_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying null spawnController check...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying null spawnController check...");
             return new BeaconAddRemoveMethodVisitor(mv, className);
         }
 

@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - SpawnMarkerSystems Bytecode Transformer
  *
@@ -47,14 +49,14 @@ public class SpawnMarkerSystemsTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("spawnMarkerSystems")) {
-            System.out.println("[HyFixes-Early] SpawnMarkerSystemsTransformer DISABLED by config");
+            info("SpawnMarkerSystemsTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...");
-        System.out.println("[HyFixes-Early] Fixing null npcReferences crash in onEntityRemove()");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...");
+        verbose("Fixing null npcReferences crash in onEntityRemove()");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -64,16 +66,15 @@ public class SpawnMarkerSystemsTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] MarkerAddRemoveSystem transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("MarkerAddRemoveSystem transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform MarkerAddRemoveSystem!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform MarkerAddRemoveSystem!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -64,7 +65,7 @@ public class CreateRandomSpawnJobMethodVisitor extends MethodVisitor {
             // This method returns something related to spawn parameters
             // Could be getRandomSpawn() or similar
             sawSpawnReturnMethod = true;
-            System.out.println("[HyFixes-Early] Detected spawn-returning method call: " + name + descriptor);
+            verbose("Detected spawn-returning method call: " + name + descriptor);
         }
     }
 
@@ -78,7 +79,7 @@ public class CreateRandomSpawnJobMethodVisitor extends MethodVisitor {
             sawSpawnReturnMethod = false;
 
             // Inject null check right after storing the spawn variable
-            System.out.println("[HyFixes-Early] Injecting null check after spawn stored to var " + var);
+            verbose("Injecting null check after spawn stored to var " + var);
 
             Label continueLabel = new Label();
 
@@ -202,7 +203,7 @@ public class CreateRandomSpawnJobMethodVisitor extends MethodVisitor {
     @Override
     public void visitEnd() {
         if (!injectedNullCheck) {
-            System.out.println("[HyFixes-Early] WARNING: Could not find spawn variable assignment to inject null check!");
+            verbose("WARNING: Could not find spawn variable assignment to inject null check!");
         }
         target.visitEnd();
     }

@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -56,7 +57,7 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
             String str = (String) value;
             if (str.contains("Duplicate block components")) {
                 sawDuplicateBlockComponentsString = true;
-                System.out.println("[HyFixes-Early] Found 'Duplicate block components' exception pattern");
+                verbose("Found 'Duplicate block components' exception pattern");
             }
         }
         target.visitLdcInsn(value);
@@ -69,7 +70,7 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
             for (Object arg : bootstrapMethodArguments) {
                 if (arg instanceof String && ((String) arg).contains("Duplicate block components")) {
                     sawDuplicateBlockComponentsString = true;
-                    System.out.println("[HyFixes-Early] Found 'Duplicate block components' in string concat");
+                    verbose("Found 'Duplicate block components' in string concat");
                     break;
                 }
             }
@@ -96,7 +97,7 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
             sawDuplicateBlockComponentsString = false;
             sawNewIllegalArgumentException = false;
 
-            System.out.println("[HyFixes-Early] Replaced ATHROW with warning + return");
+            verbose("Replaced ATHROW with warning + return");
             return; // Don't emit the original ATHROW
         }
 

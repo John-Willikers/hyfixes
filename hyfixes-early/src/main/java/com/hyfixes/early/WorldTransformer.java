@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - World Bytecode Transformer
  *
@@ -51,14 +53,14 @@ public class WorldTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("world")) {
-            System.out.println("[HyFixes-Early] WorldTransformer DISABLED by config");
+            info("WorldTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming World class...");
-        System.out.println("[HyFixes-Early] Fixing addPlayer() race condition with retry loop (Issue #7)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming World class...");
+        verbose("Fixing addPlayer() race condition with retry loop (Issue #7)");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -68,16 +70,15 @@ public class WorldTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] World transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("World transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform World!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform World!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

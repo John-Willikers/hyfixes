@@ -2,6 +2,7 @@ package com.hyfixes.early;
 
 import com.hyfixes.early.config.EarlyConfigManager;
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -65,7 +66,7 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
     public void visitInsn(int opcode) {
         // Check if this is the ATHROW after "Player is already in a world"
         if (opcode == Opcodes.ATHROW && sawPlayerAlreadyInWorldString) {
-            System.out.println("[HyFixes-Early] Injecting retry loop for race condition fix");
+            verbose("Injecting retry loop for race condition fix");
 
             // Pop the exception that was built (we'll recreate it if needed)
             target.visitInsn(Opcodes.POP);
@@ -158,7 +159,7 @@ public class WorldAddPlayerMethodVisitor extends MethodVisitor {
         // Detect the "Player is already in a world" string constant
         if (value instanceof String && value.equals("Player is already in a world")) {
             sawPlayerAlreadyInWorldString = true;
-            System.out.println("[HyFixes-Early] Found 'Player is already in a world' exception pattern - will inject retry loop");
+            verbose("Found 'Player is already in a world' exception pattern - will inject retry loop");
         }
         target.visitLdcInsn(value);
     }

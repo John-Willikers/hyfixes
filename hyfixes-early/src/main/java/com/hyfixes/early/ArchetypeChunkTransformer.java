@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - ArchetypeChunk Bytecode Transformer
  *
@@ -49,15 +51,15 @@ public class ArchetypeChunkTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("archetypeChunk")) {
-            System.out.println("[HyFixes-Early] ArchetypeChunkTransformer DISABLED by config");
+            info("ArchetypeChunkTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming ArchetypeChunk class...");
-        System.out.println("[HyFixes-Early] Fixing getComponent() IndexOutOfBoundsException (Issue #20)");
-        System.out.println("[HyFixes-Early] Fixing copySerializableEntity() IndexOutOfBoundsException (Issue #29)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming ArchetypeChunk class...");
+        verbose("Fixing getComponent() IndexOutOfBoundsException (Issue #20)");
+        verbose("Fixing copySerializableEntity() IndexOutOfBoundsException (Issue #29)");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -67,16 +69,15 @@ public class ArchetypeChunkTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] ArchetypeChunk transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("ArchetypeChunk transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform ArchetypeChunk!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform ArchetypeChunk!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

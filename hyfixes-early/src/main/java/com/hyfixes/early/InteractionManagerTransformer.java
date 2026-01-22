@@ -6,19 +6,23 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - InteractionManager Bytecode Transformer
  *
- * This transformer fixes the client timeout bug in InteractionManager.serverTick()
- * that kicks players when clients are slow to respond.
+ * This transformer applies multiple fixes to InteractionManager:
  *
- * The Bug:
+ * Fix 1 - Client Timeout (Issue #40):
  * In InteractionManager.serverTick(), when a client doesn't send clientData within
  * the timeout window, a RuntimeException is thrown, kicking the player.
+ * We wrap the method in a try-catch to handle it gracefully.
  *
- * The Fix:
- * Wrap the serverTick() method in a try-catch to catch the timeout exception
- * and handle it gracefully instead of kicking the player.
+ * Fix 2 - Log Spam Suppression:
+ * The InteractionManager logs massive amounts of data at SEVERE level when there's
+ * a client/server desync ("Client finished chain earlier than server!"). These logs
+ * dump full InteractionContext objects which can produce hundreds of lines per occurrence.
+ * We downgrade these logs from SEVERE to FINE (debug) level.
  *
  * @see <a href="https://github.com/John-Willikers/hyfixes/issues/40">Issue #40</a>
  */
@@ -39,14 +43,15 @@ public class InteractionManagerTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("interactionManager")) {
-            System.out.println("[HyFixes-Early] InteractionManagerTransformer DISABLED by config");
+            info("InteractionManagerTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming InteractionManager class...");
-        System.out.println("[HyFixes-Early] Fixing serverTick() client timeout bug (Issue #40)");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming InteractionManager class...");
+        verbose("  - Fixing serverTick() client timeout bug (Issue #40)");
+        verbose("  - Suppressing 'Client finished chain' log spam");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -56,16 +61,15 @@ public class InteractionManagerTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] InteractionManager transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("InteractionManager transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform InteractionManager!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform InteractionManager!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

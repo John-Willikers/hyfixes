@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -42,7 +43,7 @@ public class UUIDRemoveMethodVisitor extends MethodVisitor {
             owner.equals(UUID_COMPONENT_TYPE) &&
             name.equals(GET_UUID_METHOD)) {
 
-            System.out.println("[HyFixes-Early] Injecting null check before " + owner + "." + name);
+            verbose("Injecting null check before " + owner + "." + name);
 
             // At this point, uuidComponent is on the stack (ready for getUuid() call)
             // We need to: DUP it, check null, then continue

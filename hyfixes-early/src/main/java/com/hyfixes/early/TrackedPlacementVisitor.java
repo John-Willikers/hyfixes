@@ -5,6 +5,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Label;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor that transforms TrackedPlacement$OnAddRemove.onEntityRemove()
  * to handle null TrackedPlacement components gracefully.
@@ -46,7 +48,7 @@ public class TrackedPlacementVisitor extends ClassVisitor {
 
         // Target: onEntityRemove(Ref, RemoveReason, Store, CommandBuffer)V
         if (name.equals("onEntityRemove") && descriptor.contains("RemoveReason")) {
-            System.out.println("[HyFixes-Early] Found onEntityRemove method - replacing with null-safe version");
+            verbose("Found onEntityRemove method - replacing with null-safe version");
             return new OnEntityRemoveMethodVisitor(mv);
         }
 

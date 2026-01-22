@@ -1,5 +1,6 @@
 package com.hyfixes.early;
 
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -34,7 +35,7 @@ public class RemovePlayerLambdaVisitor extends MethodVisitor {
         boolean isStatic = (access & Opcodes.ACC_STATIC) != 0;
         int baseSlot = isStatic ? 0 : 1;  // Instance methods have 'this' in slot 0
         this.playerRefSlot = baseSlot + findPlayerRefParamIndex(descriptor);
-        System.out.println("[HyFixes-Early] Method is " + (isStatic ? "static" : "instance") + ", PlayerRef is in slot " + playerRefSlot);
+        verbose("Method is " + (isStatic ? "static" : "instance") + ", PlayerRef is in slot " + playerRefSlot);
     }
 
     /**

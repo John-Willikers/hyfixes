@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor that finds and wraps setInventory methods in LivingEntity.
  */
@@ -23,7 +25,7 @@ public class LivingEntityVisitor extends ClassVisitor {
 
         // Target all setInventory methods that take Inventory as first param
         if (SET_INVENTORY_METHOD.equals(name) && descriptor.startsWith("(" + INVENTORY_TYPE)) {
-            System.out.println("[HyFixes-Early] Wrapping setInventory method: " + descriptor);
+            verbose("Wrapping setInventory method: " + descriptor);
             return new SetInventoryMethodVisitor(mv, access, name, descriptor);
         }
 

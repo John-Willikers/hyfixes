@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for CommandBuffer transformation.
  * Intercepts the lambda$removeComponent$0 method to change removeComponent to tryRemoveComponent.
@@ -32,8 +34,8 @@ public class CommandBufferVisitor extends ClassVisitor {
 
         // Look for lambda$removeComponent$ methods (there could be multiple with different indices)
         if (name.startsWith(LAMBDA_METHOD_PREFIX)) {
-            System.out.println("[HyFixes-Early] Found lambda method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Transforming to use tryRemoveComponent instead of removeComponent...");
+            verbose("Found lambda method: " + name + descriptor);
+            verbose("Transforming to use tryRemoveComponent instead of removeComponent...");
             return new RemoveComponentLambdaMethodVisitor(mv, className, name);
         }
 

@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for BeaconSpawnController transformation.
  * Intercepts the createRandomSpawnJob method to add null check for spawn parameter.
@@ -29,8 +31,8 @@ public class BeaconSpawnControllerVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(CREATE_RANDOM_SPAWN_JOB_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying null spawn parameter check...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying null spawn parameter check...");
             return new CreateRandomSpawnJobMethodVisitor(mv, className, descriptor);
         }
 

@@ -4,6 +4,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * ASM ClassVisitor for SpawnReferenceSystems$MarkerAddRemoveSystem transformation.
  * Intercepts the onEntityRemove method to add null check for npcReferences array.
@@ -29,8 +31,8 @@ public class SpawnMarkerSystemsVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         if (name.equals(ON_ENTITY_REMOVE_METHOD)) {
-            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
-            System.out.println("[HyFixes-Early] Applying null npcReferences check...");
+            verbose("Found method: " + name + descriptor);
+            verbose("Applying null npcReferences check...");
             return new MarkerRemoveMethodVisitor(mv, className);
         }
 

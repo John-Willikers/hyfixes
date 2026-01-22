@@ -1,5 +1,6 @@
 package com.hyfixes.early;
 
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -42,7 +43,7 @@ public class SpawnMarkerEntityConstructorVisitor extends MethodVisitor {
                     "[L" + INVALIDATABLE_PERSISTENT_REF + ";");
 
             injected = true;
-            System.out.println("[HyFixes-Early] Injected npcReferences initialization into constructor");
+            verbose("Injected npcReferences initialization into constructor");
         }
 
         super.visitInsn(opcode);

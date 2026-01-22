@@ -5,6 +5,8 @@ import com.hypixel.hytale.plugin.early.ClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * Transformer for Universe class to fix memory leak in removePlayer().
  *
@@ -32,13 +34,13 @@ public class UniverseTransformer implements ClassTransformer {
         }
 
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("universeRemovePlayer")) {
-            System.out.println("[HyFixes-Early] UniverseTransformer is disabled, skipping");
+            info("UniverseTransformer DISABLED by config");
             return classBytes;
         }
 
         try {
-            System.out.println("[HyFixes-Early] Transforming: " + TARGET_CLASS);
-            System.out.println("[HyFixes-Early] Fixing removePlayer() memory leak (Issue #34)");
+            info("Transforming: " + TARGET_CLASS);
+            verbose("Fixing removePlayer() memory leak (Issue #34)");
 
             ClassReader reader = new ClassReader(classBytes);
             ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -47,15 +49,14 @@ public class UniverseTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             if (visitor.isTransformed()) {
-                System.out.println("[HyFixes-Early] Successfully transformed Universe removePlayer lambda");
+                info("Universe transformation COMPLETE!");
                 return writer.toByteArray();
             } else {
-                System.err.println("[HyFixes-Early] WARNING: Universe transformation did not apply!");
+                error("WARNING: Universe transformation did not apply!");
                 return classBytes;
             }
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] Error transforming Universe: " + e.getMessage());
-            e.printStackTrace();
+            error("Error transforming Universe: " + e.getMessage(), e);
             return classBytes;
         }
     }

@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.MethodVisitor;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.Opcodes;
 
 /**
@@ -39,8 +40,8 @@ public class RemoveComponentLambdaMethodVisitor extends MethodVisitor {
     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
         // Look for calls to removeComponent and change them to tryRemoveComponent
         if (name.equals("removeComponent")) {
-            System.out.println("[HyFixes-Early]   Found call: " + owner + "." + name + descriptor);
-            System.out.println("[HyFixes-Early]   Replacing with: tryRemoveComponent");
+            verbose("  Found call: " + owner + "." + name + descriptor);
+            verbose("  Replacing with: tryRemoveComponent");
 
             // Change the method name from removeComponent to tryRemoveComponent
             // The signature stays the same: (Ref, ComponentType) -> void
@@ -55,9 +56,9 @@ public class RemoveComponentLambdaMethodVisitor extends MethodVisitor {
     @Override
     public void visitEnd() {
         if (transformed) {
-            System.out.println("[HyFixes-Early]   Lambda transformation successful!");
+            verbose("  Lambda transformation successful!");
         } else {
-            System.out.println("[HyFixes-Early]   WARNING: No removeComponent call found in lambda!");
+            verbose("  WARNING: No removeComponent call found in lambda!");
         }
         super.visitEnd();
     }

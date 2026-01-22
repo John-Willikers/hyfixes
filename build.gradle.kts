@@ -5,7 +5,7 @@ plugins {
 
 group = "com.hyfixes"
 // Version is set in manifest.json - don't let gradle override it
-val projectVersion = "1.10.0"
+val projectVersion = "1.11.0"
 version = projectVersion
 
 java {
@@ -66,6 +66,11 @@ tasks.shadowJar {
 
     // Don't relocate SQLite - it has complex native loading that breaks with relocation
     // relocate("org.sqlite", "com.hyfixes.libs.sqlite")
+
+    // Exclude SLF4J - Hytale has its own logging and SQLite's SLF4J causes classloader conflicts
+    exclude("org/slf4j/**")
+    exclude("META-INF/services/org.slf4j.*")
+    exclude("META-INF/maven/org.slf4j/**")
 
     manifest {
         attributes(

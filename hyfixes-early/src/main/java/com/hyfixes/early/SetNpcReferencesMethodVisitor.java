@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -55,15 +56,12 @@ public class SetNpcReferencesMethodVisitor extends MethodVisitor {
         mv.visitTypeInsn(Opcodes.ANEWARRAY, INVALIDATABLE_PERSISTENT_REF);
         mv.visitVarInsn(Opcodes.ASTORE, 1);  // Store back to refs parameter
 
-        // Log that we fixed a null (optional, can be removed for performance)
-        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-        mv.visitLdcInsn("[HyFixes-Early] Fixed null npcReferences during CODEC load");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+        // NOTE: Removed runtime logging to prevent log spam (fix is working silently)
 
         mv.visitLabel(notNullLabel);
 
         injected = true;
-        System.out.println("[HyFixes-Early] Injected null check into setNpcReferences()");
+        verbose("Injected null check into setNpcReferences()");
     }
 
     @Override

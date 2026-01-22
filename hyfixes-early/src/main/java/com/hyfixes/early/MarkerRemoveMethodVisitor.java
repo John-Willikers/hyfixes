@@ -1,6 +1,7 @@
 package com.hyfixes.early;
 
 import org.objectweb.asm.Label;
+import static com.hyfixes.early.EarlyLogger.*;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -61,7 +62,7 @@ public class MarkerRemoveMethodVisitor extends MethodVisitor {
             (descriptor.contains("[Lcom/hypixel/hytale/server/core/entity/reference/InvalidatablePersistentRef;") &&
              descriptor.startsWith("()"))) {
             sawNpcReferencesCall = true;
-            System.out.println("[HyFixes-Early] Detected getNpcReferences() call: " + owner + "." + name + descriptor);
+            verbose("Detected getNpcReferences() call: " + owner + "." + name + descriptor);
         }
     }
 
@@ -75,7 +76,7 @@ public class MarkerRemoveMethodVisitor extends MethodVisitor {
             sawNpcReferencesCall = false;
 
             // Inject null check right after storing the npcReferences array
-            System.out.println("[HyFixes-Early] Injecting null check after npcReferences stored to var " + var);
+            verbose("Injecting null check after npcReferences stored to var " + var);
 
             Label continueLabel = new Label();
 
@@ -193,8 +194,8 @@ public class MarkerRemoveMethodVisitor extends MethodVisitor {
     @Override
     public void visitEnd() {
         if (!injectedNullCheck) {
-            System.out.println("[HyFixes-Early] WARNING: Could not find getNpcReferences() call to inject null check!");
-            System.out.println("[HyFixes-Early] The method structure may have changed - fix may not be applied.");
+            verbose("WARNING: Could not find getNpcReferences() call to inject null check!");
+            verbose("The method structure may have changed - fix may not be applied.");
         }
         target.visitEnd();
     }

@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - SpawnReferenceSystems Bytecode Transformer
  *
@@ -43,14 +45,14 @@ public class SpawnReferenceSystemsTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("spawnReferenceSystems")) {
-            System.out.println("[HyFixes-Early] SpawnReferenceSystemsTransformer DISABLED by config");
+            info("SpawnReferenceSystemsTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...");
-        System.out.println("[HyFixes-Early] Fixing null spawnController crash in onEntityAdded()");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...");
+        verbose("Fixing null spawnController crash in onEntityAdded()");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -60,16 +62,15 @@ public class SpawnReferenceSystemsTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] SpawnReferenceSystems transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("SpawnReferenceSystems transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform SpawnReferenceSystems!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform SpawnReferenceSystems!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }

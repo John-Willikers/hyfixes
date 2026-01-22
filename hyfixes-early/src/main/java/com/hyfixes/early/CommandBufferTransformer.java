@@ -6,6 +6,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ClassVisitor;
 
+import static com.hyfixes.early.EarlyLogger.*;
+
 /**
  * HyFixes Early Plugin - CommandBuffer Bytecode Transformer
  *
@@ -55,15 +57,15 @@ public class CommandBufferTransformer implements ClassTransformer {
 
         // Check if transformer is enabled via config
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("commandBuffer")) {
-            System.out.println("[HyFixes-Early] CommandBufferTransformer DISABLED by config");
+            info("CommandBufferTransformer DISABLED by config");
             return classBytes;
         }
 
-        System.out.println("[HyFixes-Early] ================================================");
-        System.out.println("[HyFixes-Early] Transforming CommandBuffer class...");
-        System.out.println("[HyFixes-Early] Fixing removeComponent() race condition (Issue #12)");
-        System.out.println("[HyFixes-Early] Making deferred removals use tryRemoveComponent()");
-        System.out.println("[HyFixes-Early] ================================================");
+        separator();
+        info("Transforming CommandBuffer class...");
+        verbose("Fixing removeComponent() race condition (Issue #12)");
+        verbose("Making deferred removals use tryRemoveComponent()");
+        separator();
 
         try {
             ClassReader reader = new ClassReader(classBytes);
@@ -73,16 +75,15 @@ public class CommandBufferTransformer implements ClassTransformer {
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
             byte[] transformedBytes = writer.toByteArray();
-            System.out.println("[HyFixes-Early] CommandBuffer transformation COMPLETE!");
-            System.out.println("[HyFixes-Early] Original size: " + classBytes.length + " bytes");
-            System.out.println("[HyFixes-Early] Transformed size: " + transformedBytes.length + " bytes");
+            info("CommandBuffer transformation COMPLETE!");
+            verbose("Original size: " + classBytes.length + " bytes");
+            verbose("Transformed size: " + transformedBytes.length + " bytes");
 
             return transformedBytes;
 
         } catch (Exception e) {
-            System.err.println("[HyFixes-Early] ERROR: Failed to transform CommandBuffer!");
-            System.err.println("[HyFixes-Early] Returning original bytecode to prevent crash.");
-            e.printStackTrace();
+            error("ERROR: Failed to transform CommandBuffer!");
+            error("Returning original bytecode to prevent crash.", e);
             return classBytes;
         }
     }
