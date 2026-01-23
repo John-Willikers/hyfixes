@@ -45,10 +45,14 @@ public class PlayerSystemsTransformer implements ClassTransformer {
 
             ClassReader reader = new ClassReader(classBytes);
             ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            ClassVisitor visitor = new PlayerSystemsVisitor(writer);
+            PlayerSystemsVisitor visitor = new PlayerSystemsVisitor(writer);
 
             reader.accept(visitor, ClassReader.EXPAND_FRAMES);
 
+            if (!visitor.isTransformed()) {
+                System.err.println("[HyFixes-Early] No matching instructions found to transform in " + className + " - leaving class bytes unchanged");
+                return classBytes;
+            }
             System.out.println("[HyFixes-Early] Successfully transformed " + className);
             return writer.toByteArray();
 
