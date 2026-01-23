@@ -176,11 +176,17 @@ public class PlayerRemovedMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitTableSwitchInsn(min, max, dflt, labels);
     }
 
     @Override
     public void visitLookupSwitchInsn(Label dflt, int[] keys, Label[] labels) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitLookupSwitchInsn(dflt, keys, labels);
     }
 
