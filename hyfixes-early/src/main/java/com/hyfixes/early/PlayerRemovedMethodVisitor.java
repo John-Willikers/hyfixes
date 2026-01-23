@@ -207,6 +207,9 @@ public class PlayerRemovedMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitLineNumber(int line, Label start) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitLineNumber(line, start);
     }
 
